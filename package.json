@@ -16,6 +16,6 @@
   },
   "scripts": {
     "lint:sol": "solhint --config ./.solhint.json --max-warnings 0 -f table contracts/**/*.sol",
-    "prettier:solidity": "prettier --write contracts/**/*.sol"
+    "prettier:sol": "prettier --write contracts/**/*.sol"
   }
 }

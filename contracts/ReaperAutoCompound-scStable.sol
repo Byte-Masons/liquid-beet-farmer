@@ -6,12 +6,6 @@ import './ReaperBaseStrategy.sol';
 import '@openzeppelin/contracts/token/ERC20/ERC20.sol';
 import '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
 
-interface IUniswapV2Pair {
-    function token0() external view returns (address);
-
-    function token1() external view returns (address);
-}
-
 interface IUniswapV2Router01 {
     function factory() external pure returns (address);
 
