@@ -9,10 +9,7 @@ interface IPaymentSplitter {
 
     function release(address token, address account) external;
 
-    function released(address token, address account)
-        external
-        view
-        returns (uint256);
+    function released(address token, address account) external view returns (uint256);
 
     function released(address account) external view returns (uint256);
 

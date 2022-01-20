@@ -3,4 +3,4 @@ build/
 node_modules/
 
 #files
-contracts/XShare.sol
+contracts/interfaces/IAsset.sol
