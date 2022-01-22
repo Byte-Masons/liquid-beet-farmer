@@ -3,6 +3,7 @@
 pragma solidity 0.8.9;
 
 import './ReaperBaseStrategy.sol';
+import './interfaces/IBasePool.sol';
 import '@openzeppelin/contracts/token/ERC20/ERC20.sol';
 import '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
 
@@ -239,24 +240,52 @@ contract ReaperAutoCompound_LiquidV2_Beethoven is ReaperBaseStrategy {
     address public constant MASTER_CHEF = address(0x6e2ad6527901c9664f016466b8DA1357a004db0f);
     address public constant BEET_VAULT = address(0x20dd72Ed959b6147912C2e529F0a0C651c33c9ce);
 
+    uint256 public immutable poolId;
+    bytes32 public immutable poolID_bytes;
+    
     /**
      * @dev Routes we take to swap tokens using routers.
-     * {rewardTokenToWftmRoute} - Route we take to get from {rewardToken} into {wftm}.
-     * {rewardTokenToStakedTokenRoute} - Route we take to get from {rewardToken} into {stakedToken}.
+     * {rewardTokenToWftmRoute} - Route ID to swap from {rewardToken} to {wftm}.
+     * {rewardTokenToStakedTokenRoute} - Routes used to go from {wftm} to {token}.
      */
-    address[] public rewardTokenToWftmRoute = [rewardToken, wftm];
-    address[] public previousStakedTokenToWftmRoute = [previousStakedToken, wftm];
-    address[] public wftmTokenToStakedToken = [wftm, stakedToken];
+    bytes32 public route_ID;
+    bytes32 public constant rewardTokenToWftmRoute_ID = 0x5e02ab5699549675a6d3beeb92a62782712d0509000200000000000000000138;
+    mapping(address => bytes32) public wftmToTokenRoute_ID;
 
     /**
      * @dev Initializes the strategy. Sets parameters, saves routes, and gives allowances.
-     * @notice see documentation for each variable above its respective declaration.
+     * @param _vault Vault address
+     * @param _feeRemitters Addresses to send fees to. Size: 2
+     * @param _strategists Strategists piloting this strategy
+     * @param _bpToken Token staked in the farm
+     * @param _poolId Masterchef pool id
      */
     constructor(
         address _vault,
         address[] memory _feeRemitters,
-        address[] memory _strategists
+        address[] memory _strategists,
+        address _bpToken,
+        uint _poolId,
+        bytes32[] memory _wftmToTokenRoutes_ID
     ) ReaperBaseStrategy(_vault, _feeRemitters, _strategists) {
+        bpToken = _bpToken;
+        poolId = _poolId;
+        poolID_bytes = IBasePool(_bpToken).getPoolId();
+
+        IERC20[] memory _bpTokens;
+
+        (_bpTokens,,) = IVault(BEET_VAULT).getPoolTokens(poolID_bytes);
+
+        //todo Move route logic to another initialization function for clarity and simplify deployment
+        for(uint256 i; i < _bpTokens.length; i++) {
+            bptUnderlyingTokens[i] = address(_bpTokens[i]);
+            if(bptUnderlyingTokens[i] == address(wftm)) {
+                wftmToTokenRoute_ID[address(wftm)] = 0;
+            } else {
+                wftmToTokenRoute_ID[bptUnderlyingTokens[i]] = _wftmToTokenRoutes_ID[i];
+            }
+        }
+
         _giveAllowances();
     }
 
@@ -337,38 +366,26 @@ contract ReaperAutoCompound_LiquidV2_Beethoven is ReaperBaseStrategy {
 
     function _swap(address _tokenIN, address _tokenOUT, bytes32 _pool, uint256 amount) internal{
 
-        // IVault.SingleSwap memory singleSwap;
-        // IVault.SwapKind swapKind = IVault.SwapKind.GIVEN_IN;
+        IVault.SingleSwap memory singleSwap;
+        IVault.SwapKind swapKind = IVault.SwapKind.GIVEN_IN;
 
-        // singleSwap.poolId = _pool;
-        // singleSwap.kind = swapKind;
-        // singleSwap.assetIn = IAsset(_tokenIN);
-        // singleSwap.assetOut = IAsset(_tokenOUT);
-        // singleSwap.amount = amount;
-        // singleSwap.userData = abi.encode(0);
+        singleSwap.poolId = _pool;
+        singleSwap.kind = swapKind;
+        singleSwap.assetIn = IAsset(_tokenIN);
+        singleSwap.assetOut = IAsset(_tokenOUT);
+        singleSwap.amount = amount;
+        singleSwap.userData = abi.encode(0);
 
-        // IVault.FundManagement memory funds;
-        // funds.sender = address(this);
-        // funds.fromInternalBalance = false;
-        // funds.recipient = payable(address(this));
-        // funds.toInternalBalance = false;
+        IVault.FundManagement memory funds;
+        funds.sender = address(this);
+        funds.fromInternalBalance = false;
+        funds.recipient = payable(address(this));
+        funds.toInternalBalance = false;
 
-        // IERC20(_tokenIN).safeApprove(BeetVault, 0);
-        // IERC20(_tokenIN).safeApprove(BeetVault, amount);
+        IERC20(_tokenIN).safeApprove(BEET_VAULT, amount);
 
         // IVault(BeetVault).swap(singleSwap, funds, 1, (block.timestamp + 600));
 
-    }
-
-    function addTokenAndScToken(address _token, address _scToken) external {
-        _onlyStrategistOrOwner();
-        //verify that token matches sctoken's underlying
-        //if yes, success=true
-    }
-
-    function setTargetLtv(uint256 _targetLtv) external {
-        _onlyStrategistOrOwner();
-        (, uint256 collateralFactorMantissa, ) = compound.markets(address(stakedToken));
     }
 
     /**
@@ -386,8 +403,6 @@ contract ReaperAutoCompound_LiquidV2_Beethoven is ReaperBaseStrategy {
     function retireStrat() external {
         require(msg.sender == vault, '!vault');
         //todo withdraw funds
-        uint256 stakedTokenBal = IERC20(stakedToken).balanceOf(address(this));
-        IERC20(stakedToken).safeTransfer(vault, stakedTokenBal);
     }
 
     /**
@@ -425,7 +440,9 @@ contract ReaperAutoCompound_LiquidV2_Beethoven is ReaperBaseStrategy {
      * @dev Set allowance for token transfers
      */
     function _giveAllowances() internal {
-        //todo approve to max
+        IERC20(bpToken).safeIncreaseAllowance(MASTER_CHEF, type(uint256).max - IERC20(bpToken).allowance(address(this), MASTER_CHEF));
+        IERC20(rewardToken).safeIncreaseAllowance(BEET_VAULT, type(uint256).max - IERC20(rewardToken).allowance(address(this), BEET_VAULT));
+        IERC20(wftm).safeIncreaseAllowance(BEET_VAULT, type(uint256).max - IERC20(wftm).allowance(address(this), BEET_VAULT));
     }
 
     /**
