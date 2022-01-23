@@ -43,9 +43,7 @@ contract ReaperAutoCompound_LiquidV2_Beethoven is ReaperBaseStrategy {
     address public constant BEET_VAULT = address(0x20dd72Ed959b6147912C2e529F0a0C651c33c9ce);
     address public constant SPOOKY_ROUTER = address(0xF491e7B69E4244ad4002BC14e878a34207E38c29);
     address public constant SPIRIT_ROUTER = address(0x16327E3FbDaCA3bcF7E38F5Af2599D2DDc33aE52);
-
     uint256 public immutable poolId;
-    bytes32 public immutable poolID_bytes;
     
     /**
      * @dev Routes we take to swap tokens using routers.
@@ -54,7 +52,10 @@ contract ReaperAutoCompound_LiquidV2_Beethoven is ReaperBaseStrategy {
      */
     bytes32 public route_ID;
     address[] public rewardTokenToWftmRoute = [REWARD_TOKEN, WFTM];
-    mapping(address => bytes32) public wftmToTokenRoute_ID;
+    mapping(address => address[]) public underlyingToWftmToUnderlyingRoute;
+    mapping(address => uint256) public underlyingToWeight;
+
+    string constant CONSTRUCTOR_ERROR = "constructor error";
 
     /**
      * @dev Initializes the strategy. Sets parameters, saves routes, and gives allowances.
@@ -63,31 +64,36 @@ contract ReaperAutoCompound_LiquidV2_Beethoven is ReaperBaseStrategy {
      * @param _strategists Strategists piloting this strategy
      * @param _bpToken Token staked in the farm
      * @param _poolId Masterchef pool id => Liquid Masterchef
-     * @param _wftmToTokenRoutes_ID ID of the pools used for swapping wftm to underlying tokens on beethoven
+     * @param _ratios weight of each underlying token
+     * @param _routes swap routes to go from wftm to each underlying token
      */
     constructor(
         address _vault,
         address[] memory _feeRemitters,
         address[] memory _strategists,
         address _bpToken,
-        uint _poolId,
-        bytes32[] memory _wftmToTokenRoutes_ID
+        uint256 _poolId,
+        uint256[] memory _ratios,
+        address[][] memory _routes
     ) ReaperBaseStrategy(_vault, _feeRemitters, _strategists) {
+        require(_ratios.length == _routes.length, CONSTRUCTOR_ERROR);
+
         bpToken = _bpToken;
         poolId = _poolId;
-        poolID_bytes = IBasePool(_bpToken).getPoolId();
-
+        bytes32 poolID_bytes = IBasePool(_bpToken).getPoolId();
         IERC20[] memory _bpTokens;
-
         (_bpTokens,,) = IVault(BEET_VAULT).getPoolTokens(poolID_bytes);
 
-        //todo Move route logic to another initialization function for clarity and simplify deployment
+        require(_bpTokens.length == _ratios.length, CONSTRUCTOR_ERROR);
+
         for(uint256 i; i < _bpTokens.length; i++) {
             bptUnderlyingTokens[i] = address(_bpTokens[i]);
-            if(bptUnderlyingTokens[i] == address(WFTM)) {
-                wftmToTokenRoute_ID[address(WFTM)] = 0;
+            if(bptUnderlyingTokens[i] == WFTM) {
+                underlyingToWftmToUnderlyingRoute[WFTM] = [WFTM];
+                underlyingToWeight[WFTM] = _ratios[i];
             } else {
-                wftmToTokenRoute_ID[bptUnderlyingTokens[i]] = _wftmToTokenRoutes_ID[i];
+                underlyingToWftmToUnderlyingRoute[bptUnderlyingTokens[i]] = _routes[i];
+                underlyingToWeight[bptUnderlyingTokens[i]] = _ratios[i];
             }
         }
 
@@ -258,8 +264,8 @@ contract ReaperAutoCompound_LiquidV2_Beethoven is ReaperBaseStrategy {
      */
     function _giveAllowances() internal {
         IERC20(bpToken).safeIncreaseAllowance(MASTER_CHEF, type(uint256).max - IERC20(bpToken).allowance(address(this), MASTER_CHEF));
-        IERC20(REWARD_TOKEN).safeIncreaseAllowance(BEET_VAULT, type(uint256).max - IERC20(REWARD_TOKEN).allowance(address(this), BEET_VAULT));
-        IERC20(WFTM).safeIncreaseAllowance(BEET_VAULT, type(uint256).max - IERC20(WFTM).allowance(address(this), BEET_VAULT));
+        IERC20(REWARD_TOKEN).safeIncreaseAllowance(BEET_VAULT, type(uint256).max - IERC20(REWARD_TOKEN).allowance(address(this), BEET_VAULT));//todo is this even needed?
+        IERC20(WFTM).safeIncreaseAllowance(BEET_VAULT, type(uint256).max - IERC20(WFTM).allowance(address(this), BEET_VAULT));//todo is this even needed?
     }
 
     /**
