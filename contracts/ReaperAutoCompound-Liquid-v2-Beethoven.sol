@@ -5,208 +5,9 @@ pragma solidity 0.8.9;
 import './ReaperBaseStrategy.sol';
 import './interfaces/IBasePool.sol';
 import './interfaces/IMasterChefv2.sol';
+import './interfaces/IUniswapV2Router.sol';
 import '@openzeppelin/contracts/token/ERC20/ERC20.sol';
 import '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
-
-interface IUniswapV2Router01 {
-    function factory() external pure returns (address);
-
-    function WETH() external pure returns (address);
-
-    function addLiquidity(
-        address tokenA,
-        address tokenB,
-        uint256 amountADesired,
-        uint256 amountBDesired,
-        uint256 amountAMin,
-        uint256 amountBMin,
-        address to,
-        uint256 deadline
-    )
-        external
-        returns (
-            uint256 amountA,
-            uint256 amountB,
-            uint256 liquidity
-        );
-
-    function addLiquidityETH(
-        address token,
-        uint256 amountTokenDesired,
-        uint256 amountTokenMin,
-        uint256 amountETHMin,
-        address to,
-        uint256 deadline
-    )
-        external
-        payable
-        returns (
-            uint256 amountToken,
-            uint256 amountETH,
-            uint256 liquidity
-        );
-
-    function removeLiquidity(
-        address tokenA,
-        address tokenB,
-        uint256 liquidity,
-        uint256 amountAMin,
-        uint256 amountBMin,
-        address to,
-        uint256 deadline
-    ) external returns (uint256 amountA, uint256 amountB);
-
-    function removeLiquidityETH(
-        address token,
-        uint256 liquidity,
-        uint256 amountTokenMin,
-        uint256 amountETHMin,
-        address to,
-        uint256 deadline
-    ) external returns (uint256 amountToken, uint256 amountETH);
-
-    function removeLiquidityWithPermit(
-        address tokenA,
-        address tokenB,
-        uint256 liquidity,
-        uint256 amountAMin,
-        uint256 amountBMin,
-        address to,
-        uint256 deadline,
-        bool approveMax,
-        uint8 v,
-        bytes32 r,
-        bytes32 s
-    ) external returns (uint256 amountA, uint256 amountB);
-
-    function removeLiquidityETHWithPermit(
-        address token,
-        uint256 liquidity,
-        uint256 amountTokenMin,
-        uint256 amountETHMin,
-        address to,
-        uint256 deadline,
-        bool approveMax,
-        uint8 v,
-        bytes32 r,
-        bytes32 s
-    ) external returns (uint256 amountToken, uint256 amountETH);
-
-    function swapExactTokensForTokens(
-        uint256 amountIn,
-        uint256 amountOutMin,
-        address[] calldata path,
-        address to,
-        uint256 deadline
-    ) external returns (uint256[] memory amounts);
-
-    function swapTokensForExactTokens(
-        uint256 amountOut,
-        uint256 amountInMax,
-        address[] calldata path,
-        address to,
-        uint256 deadline
-    ) external returns (uint256[] memory amounts);
-
-    function swapExactETHForTokens(
-        uint256 amountOutMin,
-        address[] calldata path,
-        address to,
-        uint256 deadline
-    ) external payable returns (uint256[] memory amounts);
-
-    function swapTokensForExactETH(
-        uint256 amountOut,
-        uint256 amountInMax,
-        address[] calldata path,
-        address to,
-        uint256 deadline
-    ) external returns (uint256[] memory amounts);
-
-    function swapExactTokensForETH(
-        uint256 amountIn,
-        uint256 amountOutMin,
-        address[] calldata path,
-        address to,
-        uint256 deadline
-    ) external returns (uint256[] memory amounts);
-
-    function swapETHForExactTokens(
-        uint256 amountOut,
-        address[] calldata path,
-        address to,
-        uint256 deadline
-    ) external payable returns (uint256[] memory amounts);
-
-    function quote(
-        uint256 amountA,
-        uint256 reserveA,
-        uint256 reserveB
-    ) external pure returns (uint256 amountB);
-
-    function getAmountOut(
-        uint256 amountIn,
-        uint256 reserveIn,
-        uint256 reserveOut
-    ) external pure returns (uint256 amountOut);
-
-    function getAmountIn(
-        uint256 amountOut,
-        uint256 reserveIn,
-        uint256 reserveOut
-    ) external pure returns (uint256 amountIn);
-
-    function getAmountsOut(uint256 amountIn, address[] calldata path) external view returns (uint256[] memory amounts);
-
-    function getAmountsIn(uint256 amountOut, address[] calldata path) external view returns (uint256[] memory amounts);
-}
-
-interface IUniswapV2Router02 is IUniswapV2Router01 {
-    function removeLiquidityETHSupportingFeeOnTransferTokens(
-        address token,
-        uint256 liquidity,
-        uint256 amountTokenMin,
-        uint256 amountETHMin,
-        address to,
-        uint256 deadline
-    ) external returns (uint256 amountETH);
-
-    function removeLiquidityETHWithPermitSupportingFeeOnTransferTokens(
-        address token,
-        uint256 liquidity,
-        uint256 amountTokenMin,
-        uint256 amountETHMin,
-        address to,
-        uint256 deadline,
-        bool approveMax,
-        uint8 v,
-        bytes32 r,
-        bytes32 s
-    ) external returns (uint256 amountETH);
-
-    function swapExactTokensForTokensSupportingFeeOnTransferTokens(
-        uint256 amountIn,
-        uint256 amountOutMin,
-        address[] calldata path,
-        address to,
-        uint256 deadline
-    ) external;
-
-    function swapExactETHForTokensSupportingFeeOnTransferTokens(
-        uint256 amountOutMin,
-        address[] calldata path,
-        address to,
-        uint256 deadline
-    ) external payable;
-
-    function swapExactTokensForETHSupportingFeeOnTransferTokens(
-        uint256 amountIn,
-        uint256 amountOutMin,
-        address[] calldata path,
-        address to,
-        uint256 deadline
-    ) external;
-}
 
 /**
  * @dev Strategy description
@@ -218,13 +19,13 @@ contract ReaperAutoCompound_LiquidV2_Beethoven is ReaperBaseStrategy {
 
         /**
      * @dev Tokens Used:
-     * {wftm} - Required for fees.
-     * {rewardToken} - Token generated by staking our funds. => LQDR
+     * {WFTM} - Required for fees.
+     * {REWARD_TOKEN} - Token generated by staking our funds. => LQDR
      * {bpToken} - Balancer Protocol Token that the strategy maximizes.
      * {bptUnderlyingTokens} - Underlying tokens of the bpToken
      */
-    IERC20 public constant wftm = IERC20(0x21be370D5312f44cB42ce377BC9b8a0cEF1A4C83);
-    IERC20 public constant rewardToken = IERC20(0x10b620b2dbAC4Faa7D7FFD71Da486f5D44cd86f9); 
+    address public constant WFTM = 0x21be370D5312f44cB42ce377BC9b8a0cEF1A4C83;
+    address public constant REWARD_TOKEN = 0x10b620b2dbAC4Faa7D7FFD71Da486f5D44cd86f9; 
     address public bpToken; 
     address[] public bptUnderlyingTokens;
 
@@ -240,17 +41,19 @@ contract ReaperAutoCompound_LiquidV2_Beethoven is ReaperBaseStrategy {
      */
     address public constant MASTER_CHEF = address(0x6e2ad6527901c9664f016466b8DA1357a004db0f);
     address public constant BEET_VAULT = address(0x20dd72Ed959b6147912C2e529F0a0C651c33c9ce);
+    address public constant SPOOKY_ROUTER = address(0xF491e7B69E4244ad4002BC14e878a34207E38c29);
+    address public constant SPIRIT_ROUTER = address(0x16327E3FbDaCA3bcF7E38F5Af2599D2DDc33aE52);
 
     uint256 public immutable poolId;
     bytes32 public immutable poolID_bytes;
     
     /**
      * @dev Routes we take to swap tokens using routers.
-     * {rewardTokenToWftmRoute} - Route ID to swap from {rewardToken} to {wftm}.
-     * {rewardTokenToStakedTokenRoute} - Routes used to go from {wftm} to {token}.
+     * {rewardTokenToWftmRoute} - Route ID to swap from {REWARD_TOKEN} to {WFTM}.
+     * {rewardTokenToStakedTokenRoute} - Routes used to go from {WFTM} to {token}.
      */
     bytes32 public route_ID;
-    bytes32 public constant rewardTokenToWftmRoute_ID = 0x5e02ab5699549675a6d3beeb92a62782712d0509000200000000000000000138;
+    address[] public rewardTokenToWftmRoute = [REWARD_TOKEN, WFTM];
     mapping(address => bytes32) public wftmToTokenRoute_ID;
 
     /**
@@ -281,8 +84,8 @@ contract ReaperAutoCompound_LiquidV2_Beethoven is ReaperBaseStrategy {
         //todo Move route logic to another initialization function for clarity and simplify deployment
         for(uint256 i; i < _bpTokens.length; i++) {
             bptUnderlyingTokens[i] = address(_bpTokens[i]);
-            if(bptUnderlyingTokens[i] == address(wftm)) {
-                wftmToTokenRoute_ID[address(wftm)] = 0;
+            if(bptUnderlyingTokens[i] == address(WFTM)) {
+                wftmToTokenRoute_ID[address(WFTM)] = 0;
             } else {
                 wftmToTokenRoute_ID[bptUnderlyingTokens[i]] = _wftmToTokenRoutes_ID[i];
             }
@@ -330,12 +133,14 @@ contract ReaperAutoCompound_LiquidV2_Beethoven is ReaperBaseStrategy {
      * @dev Core function of the strat, in charge of collecting and re-investing rewards.
      * 1. It claims rewards from the protocol.
      * 2. It charges the system fees to simplify the split.
-     * 3. It swaps the {rewardToken} token for {stakedToken}
+     * 3. It swaps the {REWARD_TOKEN} token for {stakedToken}
      * 4. Adds more liquidity to the pool if on another block than the rewards' claiming.
      * 5. It deposits the new stakedTokens.
      */
     function _harvestCore() internal override whenNotPaused {
         //todo claim rewards + add strategy-specific logic
+        IMasterChefv2(MASTER_CHEF).harvest(poolId, address(this));
+        _swapRewardToWftm();
         _chargeFees();
         _addLiquidity();
         deposit();
@@ -345,66 +150,67 @@ contract ReaperAutoCompound_LiquidV2_Beethoven is ReaperBaseStrategy {
      * @dev Returns the approx amount of profit from harvesting plus fee that
      *      would be returned to harvest caller.
      */
-    function estimateHarvest() external view virtual override returns (uint256 profit, uint256 callFeeToUser) {
-        //todo  get reward amount
-        //      convert to wftm to get profit
-        //      calculate callfee
-        //      substract callfee from profit
+    function estimateHarvest() external view virtual override returns (uint256 profit, uint256 callFeeAmount) {
+        IMasterChefv2(MASTER_CHEF).pendingLqdr(poolId, address(this));
+        uint256 wftmFromProfit = IUniswapV2Router(SPIRIT_ROUTER).getAmountsOut(IERC20(REWARD_TOKEN).balanceOf(address(this)), rewardTokenToWftmRoute)[1]; 
+        profit = ( wftmFromProfit * totalFee) / PERCENT_DIVISOR;
+        callFeeAmount = (profit * callFee) / PERCENT_DIVISOR;
+        profit -= callFeeAmount;
+    }
+
+    function _swapRewardToWftm() internal {
+        uint256 rewardTokenBal = IERC20(REWARD_TOKEN).balanceOf(address(this));
+        IUniswapV2Router(SPIRIT_ROUTER)
+            .swapExactTokensForTokensSupportingFeeOnTransferTokens(
+                rewardTokenBal,
+                0,
+                rewardTokenToWftmRoute,
+                address(this),
+                block.timestamp + 600
+            );
     }
 
     /**
      * @dev Takes out fees from the rewards. Set by constructor
-     *      callFeeToUser is set as a percentage of the fee,
-     *      as is treasuryFeeToVault
-     *      strategistFee is based on treasuryFeeToVault
+     *      callFeeAmount is set as a percentage of the totalFee,
+     *      as is treasuryFeeAmount
+     *      strategistFee is based on treasuryFeeAmount
      */
     function _chargeFees() internal {
-        //todo  update to fit strategy
-        //      get balance of reward or wftm
-        //      swap to wftm
-        //      calculate callFee, treasuryFee, feeToStrategist
-        //      transfer this sh*t (use paymentrouter for strategists)
+        uint256 wftmFee = (IERC20(WFTM).balanceOf(address(this)) * totalFee) / PERCENT_DIVISOR;
+        if (wftmFee != 0) {
+            uint256 callFeeAmount = (wftmFee * callFee) / PERCENT_DIVISOR;
+            uint256 treasuryFeeAmount = (wftmFee * treasuryFee) / PERCENT_DIVISOR;
+            uint256 strategistFeeAmount = (treasuryFeeAmount * strategistFee) / PERCENT_DIVISOR;
+            treasuryFeeAmount -= strategistFeeAmount;
+
+            IERC20(WFTM).safeTransfer(msg.sender, callFeeAmount);
+            IERC20(WFTM).safeTransfer(treasury, treasuryFeeAmount);
+            IERC20(WFTM).safeIncreaseAllowance(strategistRemitter, strategistFeeAmount);
+            IPaymentRouter(strategistRemitter).routePayment(WFTM, strategistFeeAmount);
+        }
     }
 
     /**
-     * @dev Swaps {rewardToken} for {stakedToken} using SpookySwap.
+     * @dev Swaps {REWARD_TOKEN} for {stakedToken} using SpookySwap.
      */
     function _addLiquidity() internal {
         //todo update to fit strategy
-        //      get balance of reward
-        //      swap to staked
-    }
-
-    function _swap(address _tokenIN, address _tokenOUT, bytes32 _pool, uint256 amount) internal{
-
-        IVault.SingleSwap memory singleSwap;
-        IVault.SwapKind swapKind = IVault.SwapKind.GIVEN_IN;
-
-        singleSwap.poolId = _pool;
-        singleSwap.kind = swapKind;
-        singleSwap.assetIn = IAsset(_tokenIN);
-        singleSwap.assetOut = IAsset(_tokenOUT);
-        singleSwap.amount = amount;
-        singleSwap.userData = abi.encode(0);
-
-        IVault.FundManagement memory funds;
-        funds.sender = address(this);
-        funds.fromInternalBalance = false;
-        funds.recipient = payable(address(this));
-        funds.toInternalBalance = false;
-
-        IERC20(_tokenIN).safeApprove(BEET_VAULT, amount);
-
-        // IVault(BeetVault).swap(singleSwap, funds, 1, (block.timestamp + 600));
-
-    }
+        //      swap ratios of wftm to underlying tokens
+        //      join pool with tokens and get bpToken
+}
 
     /**
      * @dev Function to calculate the total underlying {token} held by the strat.
      * It takes into account both the funds in hand, as the funds allocated in protocols.
      */
     function balanceOf() public view override returns (uint256 balance) {
-        //todo return balance
+        balance = IERC20(bpToken).balanceOf(address(this)) + balanceOfPool();
+    }
+
+    function balanceOfPool() public view returns (uint256) {
+        (uint256 _amount,) = IMasterChef(MASTER_CHEF).userInfo(poolId, address(this));
+        return _amount;
     }
 
     /**
@@ -452,8 +258,8 @@ contract ReaperAutoCompound_LiquidV2_Beethoven is ReaperBaseStrategy {
      */
     function _giveAllowances() internal {
         IERC20(bpToken).safeIncreaseAllowance(MASTER_CHEF, type(uint256).max - IERC20(bpToken).allowance(address(this), MASTER_CHEF));
-        IERC20(rewardToken).safeIncreaseAllowance(BEET_VAULT, type(uint256).max - IERC20(rewardToken).allowance(address(this), BEET_VAULT));
-        IERC20(wftm).safeIncreaseAllowance(BEET_VAULT, type(uint256).max - IERC20(wftm).allowance(address(this), BEET_VAULT));
+        IERC20(REWARD_TOKEN).safeIncreaseAllowance(BEET_VAULT, type(uint256).max - IERC20(REWARD_TOKEN).allowance(address(this), BEET_VAULT));
+        IERC20(WFTM).safeIncreaseAllowance(BEET_VAULT, type(uint256).max - IERC20(WFTM).allowance(address(this), BEET_VAULT));
     }
 
     /**
