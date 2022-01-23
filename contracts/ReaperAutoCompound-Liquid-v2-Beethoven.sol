@@ -4,6 +4,7 @@ pragma solidity 0.8.9;
 
 import './ReaperBaseStrategy.sol';
 import './interfaces/IBasePool.sol';
+import './interfaces/IBaseWeightedPool.sol';
 import './interfaces/IMasterChefv2.sol';
 import './interfaces/IUniswapV2Router.sol';
 import '@openzeppelin/contracts/token/ERC20/ERC20.sol';
@@ -44,6 +45,7 @@ contract ReaperAutoCompound_LiquidV2_Beethoven is ReaperBaseStrategy {
     address public constant SPOOKY_ROUTER = address(0xF491e7B69E4244ad4002BC14e878a34207E38c29);
     address public constant SPIRIT_ROUTER = address(0x16327E3FbDaCA3bcF7E38F5Af2599D2DDc33aE52);
     uint256 public immutable poolId;
+    bytes32 public immutable poolID_bytes;
     
     /**
      * @dev Routes we take to swap tokens using routers.
@@ -56,6 +58,7 @@ contract ReaperAutoCompound_LiquidV2_Beethoven is ReaperBaseStrategy {
     mapping(address => uint256) public underlyingToWeight;
 
     string constant CONSTRUCTOR_ERROR = "constructor error";
+    uint256 constant MINIMUM_BPT = 1; //virtually ensures we can always get the desired BPT
 
     /**
      * @dev Initializes the strategy. Sets parameters, saves routes, and gives allowances.
@@ -80,13 +83,14 @@ contract ReaperAutoCompound_LiquidV2_Beethoven is ReaperBaseStrategy {
 
         bpToken = _bpToken;
         poolId = _poolId;
-        bytes32 poolID_bytes = IBasePool(_bpToken).getPoolId();
+        poolID_bytes = IBasePool(_bpToken).getPoolId();
         IERC20[] memory _bpTokens;
         (_bpTokens,,) = IVault(BEET_VAULT).getPoolTokens(poolID_bytes);
 
         require(_bpTokens.length == _ratios.length, CONSTRUCTOR_ERROR);
 
-        for(uint256 i; i < _bpTokens.length; i++) {
+        totalUnderlyingTokens = _bpTokens.length;
+        for(uint256 i; i < totalUnderlyingTokens; i++) {
             bptUnderlyingTokens[i] = address(_bpTokens[i]);
             if(bptUnderlyingTokens[i] == WFTM) {
                 underlyingToWftmToUnderlyingRoute[WFTM] = [WFTM];
@@ -198,13 +202,53 @@ contract ReaperAutoCompound_LiquidV2_Beethoven is ReaperBaseStrategy {
     }
 
     /**
-     * @dev Swaps {REWARD_TOKEN} for {stakedToken} using SpookySwap.
+     * @dev Request {bpToken} to the {BEET_VAULT} based on underlying tokens balances
      */
     function _addLiquidity() internal {
         //todo update to fit strategy
-        //      swap ratios of wftm to underlying tokens
+        //      swap correct ratios of wftm to underlying tokens
+        //      allow the vault to transfer underlying tokens
         //      join pool with tokens and get bpToken
-}
+        _joinWeightedPool();
+    }
+
+    function _joinWeightedPool() internal {
+        /** Exact Tokens Join
+        *       User sends precise quantities of tokens, and receives an estimated but unknown (computed at run time) quantity of BPT.
+        *   Encoding
+        *       userData ABI
+        *           ['uint256', 'uint256[]', 'uint256']
+        *       userData
+        *           [EXACT_TOKENS_IN_FOR_BPT_OUT, amountsIn, minimumBPT]
+        */
+        IBaseWeightedPool.JoinKind joinKind = IBaseWeightedPool.JoinKind.EXACT_TOKENS_IN_FOR_BPT_OUT;
+
+        IAsset[] memory assets = new IAsset[](totalUnderlyingTokens);
+        uint256[] memory maxAmountsIn = new uint256[](totalUnderlyingTokens);
+        bytes memory userData;
+
+        for (uint256 i; i < totalUnderlyingTokens; i++) {
+            assets[i] = IAsset(bptUnderlyingTokens[i]);
+            maxAmountsIn[i] = IERC20(bptUnderlyingTokens[i]).balanceOf(address(this));
+        }
+        userData = abi.encode(joinKind, maxAmountsIn, MINIMUM_BPT);
+
+        IVault.JoinPoolRequest memory request;
+        request.assets = assets;
+        request.maxAmountsIn = maxAmountsIn;
+        request.userData = userData;
+        request.fromInternalBalance = false;
+
+        // Send request to the vault
+        IVault(BEET_VAULT).joinPool(
+            poolID_bytes,
+            address(this),
+            address(this),
+            request
+        );
+    }
+
+    //todo function to fetch the pool token weights with : pool.getNormalizedWeights();
 
     /**
      * @dev Function to calculate the total underlying {token} held by the strat.
