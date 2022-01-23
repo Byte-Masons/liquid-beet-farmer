@@ -4,6 +4,7 @@ pragma solidity 0.8.9;
 
 import './ReaperBaseStrategy.sol';
 import './interfaces/IBasePool.sol';
+import './interfaces/IMasterChefv2.sol';
 import '@openzeppelin/contracts/token/ERC20/ERC20.sol';
 import '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
 
@@ -258,7 +259,8 @@ contract ReaperAutoCompound_LiquidV2_Beethoven is ReaperBaseStrategy {
      * @param _feeRemitters Addresses to send fees to. Size: 2
      * @param _strategists Strategists piloting this strategy
      * @param _bpToken Token staked in the farm
-     * @param _poolId Masterchef pool id
+     * @param _poolId Masterchef pool id => Liquid Masterchef
+     * @param _wftmToTokenRoutes_ID ID of the pools used for swapping wftm to underlying tokens on beethoven
      */
     constructor(
         address _vault,
@@ -296,8 +298,11 @@ contract ReaperAutoCompound_LiquidV2_Beethoven is ReaperBaseStrategy {
      * It gets called whenever someone deposits in the strategy's vault contract.
      */
     function deposit() public whenNotPaused {
-        //todo  get balance of strat
-        //      deposit in protocol
+        uint256 bpTokenBal = IERC20(bpToken).balanceOf(address(this));
+
+        if (bpTokenBal != 0) {
+            IMasterChefv2(MASTER_CHEF).deposit(poolId, bpTokenBal, address(this));
+        }
     }
 
     /**
@@ -307,12 +312,18 @@ contract ReaperAutoCompound_LiquidV2_Beethoven is ReaperBaseStrategy {
      */
     function withdraw(uint256 _amount) external {
         require(_msgSender() == vault, '!vault');
-        //todo  get balance in strat
-        //      is balance of strat enough ?
-        //      if not, withdraw from protocol
-        //      if withdrawn too much, reduce to amount
-        //      calculate and deduct withdrawFee
-        //      send sh*t to vault
+        uint256 bpTokenBal = IERC20(bpToken).balanceOf(address(this));
+        if (bpTokenBal < _amount) {
+            IMasterChefv2(MASTER_CHEF).withdraw(poolId, _amount - bpTokenBal, address(this));
+            bpTokenBal = IERC20(bpToken).balanceOf(address(this));
+        }
+
+        if (bpTokenBal > _amount) {
+            bpTokenBal = _amount;
+        }
+
+        uint256 withdrawFee = (bpTokenBal * securityFee) / PERCENT_DIVISOR;
+        IERC20(bpToken).safeTransfer(vault, bpTokenBal - withdrawFee);
     }
 
     /**
