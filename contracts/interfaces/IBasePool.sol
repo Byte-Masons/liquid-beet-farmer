@@ -3,6 +3,7 @@
 pragma solidity 0.8.9;
 
 import './IPoolSwapStructs.sol';
+
 interface IBasePool is IPoolSwapStructs {
     /**
      * @dev Called by the Vault when a user calls `IVault.joinPool` to add liquidity to this Pool. Returns how many of

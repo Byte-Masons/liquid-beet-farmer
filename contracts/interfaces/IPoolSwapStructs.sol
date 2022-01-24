@@ -3,6 +3,7 @@
 pragma solidity 0.8.9;
 
 import './IVault.sol';
+
 interface IPoolSwapStructs {
     // This is not really an interface - it just defines common structs used by other interfaces: IGeneralPool and
     // IMinimalSwapInfoPool.

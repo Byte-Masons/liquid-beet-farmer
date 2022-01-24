@@ -156,7 +156,12 @@ interface IVault is ISignaturesValidator, ITemporarilyPausable {
     //
     // Emits an `ExternalBalanceTransfer` event.
 
-    enum UserBalanceOpKind { DEPOSIT_INTERNAL, WITHDRAW_INTERNAL, TRANSFER_INTERNAL, TRANSFER_EXTERNAL }
+    enum UserBalanceOpKind {
+        DEPOSIT_INTERNAL,
+        WITHDRAW_INTERNAL,
+        TRANSFER_INTERNAL,
+        TRANSFER_EXTERNAL
+    }
 
     /**
      * @dev Emitted when a user's Internal Balance changes, either from calls to `manageUserBalance`, or through
@@ -189,7 +194,11 @@ interface IVault is ISignaturesValidator, ITemporarilyPausable {
     //  - Two Token: only allows two tokens to be registered. This achieves the lowest possible swap gas cost. Like
     // minimal swap info Pools, these are called via IMinimalSwapInfoPool.
 
-    enum PoolSpecialization { GENERAL, MINIMAL_SWAP_INFO, TWO_TOKEN }
+    enum PoolSpecialization {
+        GENERAL,
+        MINIMAL_SWAP_INFO,
+        TWO_TOKEN
+    }
 
     /**
      * @dev Registers the caller account as a Pool with a given specialization setting. Returns the Pool's ID, which
@@ -423,7 +432,10 @@ interface IVault is ISignaturesValidator, ITemporarilyPausable {
         uint256[] protocolFeeAmounts
     );
 
-    enum PoolBalanceChangeKind { JOIN, EXIT }
+    enum PoolBalanceChangeKind {
+        JOIN,
+        EXIT
+    }
 
     // Swaps
     //
@@ -472,7 +484,10 @@ interface IVault is ISignaturesValidator, ITemporarilyPausable {
     //
     // Finally, Internal Balance can be used when either sending or receiving tokens.
 
-    enum SwapKind { GIVEN_IN, GIVEN_OUT }
+    enum SwapKind {
+        GIVEN_IN,
+        GIVEN_OUT
+    }
 
     /**
      * @dev Performs a swap with a single Pool.
@@ -626,8 +641,6 @@ interface IVault is ISignaturesValidator, ITemporarilyPausable {
         FundManagement memory funds
     ) external returns (int256[] memory assetDeltas);
 
-
-
     // Asset Management
     //
     // Each token registered for a Pool can be assigned an Asset Manager, which is able to freely withdraw the Pool's
@@ -667,7 +680,11 @@ interface IVault is ISignaturesValidator, ITemporarilyPausable {
      * Updates don't affect the Pool's cash balance, but because the managed balance changes, it does alter the total.
      * The external amount can be either increased or decreased by this call (i.e., reporting a gain or a loss).
      */
-    enum PoolBalanceOpKind { WITHDRAW, DEPOSIT, UPDATE }
+    enum PoolBalanceOpKind {
+        WITHDRAW,
+        DEPOSIT,
+        UPDATE
+    }
 
     /**
      * @dev Emitted when a Pool's token Asset Manager alters its balance via `managePoolBalance`.
