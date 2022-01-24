@@ -59,6 +59,7 @@ contract ReaperAutoCompound_LiquidV2_Beethoven is ReaperBaseStrategy {
 
     string constant CONSTRUCTOR_ERROR = 'constructor error';
     uint256 constant MINIMUM_BPT = 1; //virtually ensures we can always get the desired BPT
+    bool hasUnderlyingWftm;
 
     /**
      * @dev Initializes the strategy. Sets parameters, saves routes, and gives allowances.
@@ -95,6 +96,7 @@ contract ReaperAutoCompound_LiquidV2_Beethoven is ReaperBaseStrategy {
             if (bptUnderlyingTokens[i] == WFTM) {
                 wftmToUnderlyingRoute[WFTM] = [WFTM];
                 underlyingToWeight[WFTM] = _ratios[i];
+                hasUnderlyingWftm = true;
             } else {
                 wftmToUnderlyingRoute[bptUnderlyingTokens[i]] = _routes[i];
                 underlyingToWeight[bptUnderlyingTokens[i]] = _ratios[i];
@@ -224,9 +226,13 @@ contract ReaperAutoCompound_LiquidV2_Beethoven is ReaperBaseStrategy {
                     block.timestamp + 600
                 );
                 tokenBal = IERC20(token).balanceOf(address(this));
+                IERC20(token).safeIncreaseAllowance(BEET_VAULT, tokenBal);
             }
+        }
 
-            IERC20(token).safeIncreaseAllowance(BEET_VAULT, tokenBal);
+        // wftm balance left should match its weight
+        if (hasUnderlyingWftm) {
+            IERC20(WFTM).safeIncreaseAllowance(BEET_VAULT, IERC20(WFTM).balanceOf(address(this)));
         }
 
         _joinWeightedPool();
