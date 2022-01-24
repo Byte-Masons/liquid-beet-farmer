@@ -54,7 +54,7 @@ contract ReaperAutoCompound_LiquidV2_Beethoven is ReaperBaseStrategy {
      */
     bytes32 public route_ID;
     address[] public rewardTokenToWftmRoute = [REWARD_TOKEN, WFTM];
-    mapping(address => address[]) public underlyingToWftmToUnderlyingRoute;
+    mapping(address => address[]) public wftmToUnderlyingRoute;
     mapping(address => uint256) public underlyingToWeight;
 
     string constant CONSTRUCTOR_ERROR = "constructor error";
@@ -93,10 +93,10 @@ contract ReaperAutoCompound_LiquidV2_Beethoven is ReaperBaseStrategy {
         for(uint256 i; i < totalUnderlyingTokens; i++) {
             bptUnderlyingTokens[i] = address(_bpTokens[i]);
             if(bptUnderlyingTokens[i] == WFTM) {
-                underlyingToWftmToUnderlyingRoute[WFTM] = [WFTM];
+                wftmToUnderlyingRoute[WFTM] = [WFTM];
                 underlyingToWeight[WFTM] = _ratios[i];
             } else {
-                underlyingToWftmToUnderlyingRoute[bptUnderlyingTokens[i]] = _routes[i];
+                wftmToUnderlyingRoute[bptUnderlyingTokens[i]] = _routes[i];
                 underlyingToWeight[bptUnderlyingTokens[i]] = _ratios[i];
             }
         }
@@ -205,10 +205,29 @@ contract ReaperAutoCompound_LiquidV2_Beethoven is ReaperBaseStrategy {
      * @dev Request {bpToken} to the {BEET_VAULT} based on underlying tokens balances
      */
     function _addLiquidity() internal {
-        //todo update to fit strategy
-        //      swap correct ratios of wftm to underlying tokens
-        //      allow the vault to transfer underlying tokens
-        //      join pool with tokens and get bpToken
+        uint256 wftmBal = IERC20(WFTM).balanceOf(address(this));
+
+        for(uint256 i; i < totalUnderlyingTokens; i++) {
+            address token = bptUnderlyingTokens[i];
+            uint256 wftmToSwap = (wftmBal * underlyingToWeight[token]) / PERCENT_DIVISOR;
+            wftmBal -= wftmToSwap;
+
+            uint256 tokenBal = wftmToSwap;
+            if (token != WFTM) {
+                IUniswapV2Router(SPOOKY_ROUTER)
+                    .swapExactTokensForTokensSupportingFeeOnTransferTokens(
+                        wftmToSwap,
+                        0,
+                        wftmToUnderlyingRoute[token],
+                        address(this),
+                        block.timestamp + 600
+                    );
+                tokenBal = IERC20(token).balanceOf(address(this));
+            }
+
+            IERC20(token).safeIncreaseAllowance(BEET_VAULT, tokenBal);
+        }
+
         _joinWeightedPool();
     }
 
