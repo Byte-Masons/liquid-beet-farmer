@@ -2,6 +2,8 @@
 
 pragma solidity 0.8.9;
 
+import 'hardhat/console.sol';
+
 import './ReaperBaseStrategy.sol';
 import './interfaces/IBasePool.sol';
 import './interfaces/IBaseWeightedPool.sol';
@@ -151,12 +153,18 @@ contract ReaperAutoCompound_LiquidV2_Beethoven is ReaperBaseStrategy {
      * 5. It deposits the new stakedTokens.
      */
     function _harvestCore() internal override whenNotPaused {
-        //todo claim rewards + add strategy-specific logic
+        console.log('-- HARVEST IN');
         IMasterChefv2(MASTER_CHEF).harvest(poolId, address(this));
+        console.log('--- claim rewards done');
         _swapRewardToWftm();
+        console.log('--- swap rewards to wftm done');
         _chargeFees();
+        console.log('--- charge fees done');
         _addLiquidity();
+        console.log('--- add liquidity done');
         deposit();
+        console.log('--- deposit done');
+        console.log('-- HARVEST OUT');
     }
 
     /**
@@ -210,14 +218,17 @@ contract ReaperAutoCompound_LiquidV2_Beethoven is ReaperBaseStrategy {
      * @dev Request {bpToken} to the {BEET_VAULT} based on underlying tokens balances
      */
     function _addLiquidity() internal {
+        console.log('---- ADD LIQUIDITY IN');
         uint256 wftmBal = IERC20(WFTM).balanceOf(address(this));
 
         for (uint256 i; i < totalUnderlyingTokens; i++) {
+            console.log('----- LOOPING');
             address token = bptUnderlyingTokens[i];
             uint256 wftmToSwap = (wftmBal * underlyingToWeight[token]) / PERCENT_DIVISOR;
-            wftmBal -= wftmToSwap;
+            // wftmBal -= wftmToSwap;
 
             uint256 tokenBal = wftmToSwap;
+            console.log('------ tokenBal in wftm: ', tokenBal);
             if (token != WFTM) {
                 IUniswapV2Router(SPOOKY_ROUTER).swapExactTokensForTokensSupportingFeeOnTransferTokens(
                     wftmToSwap,
@@ -227,6 +238,7 @@ contract ReaperAutoCompound_LiquidV2_Beethoven is ReaperBaseStrategy {
                     block.timestamp + 600
                 );
                 tokenBal = IERC20(token).balanceOf(address(this));
+                console.log('------- tokenBal in token: ', tokenBal);
                 IERC20(token).safeIncreaseAllowance(BEET_VAULT, tokenBal);
             }
         }
@@ -236,7 +248,9 @@ contract ReaperAutoCompound_LiquidV2_Beethoven is ReaperBaseStrategy {
             IERC20(WFTM).safeIncreaseAllowance(BEET_VAULT, IERC20(WFTM).balanceOf(address(this)));
         }
 
+        console.log('----- join weighted pool');
         _joinWeightedPool();
+        console.log('---- ADD LIQUIDITY OUT');
     }
 
     function _joinWeightedPool() internal {
@@ -334,6 +348,10 @@ contract ReaperAutoCompound_LiquidV2_Beethoven is ReaperBaseStrategy {
             type(uint256).max - IERC20(bpToken).allowance(address(this), MASTER_CHEF)
         );
         IERC20(REWARD_TOKEN).safeIncreaseAllowance(
+            SPIRIT_ROUTER,
+            type(uint256).max - IERC20(REWARD_TOKEN).allowance(address(this), SPIRIT_ROUTER)
+        );
+        IERC20(REWARD_TOKEN).safeIncreaseAllowance(
             BEET_VAULT,
             type(uint256).max - IERC20(REWARD_TOKEN).allowance(address(this), BEET_VAULT)
         ); //todo is this even needed?
@@ -341,6 +359,10 @@ contract ReaperAutoCompound_LiquidV2_Beethoven is ReaperBaseStrategy {
             BEET_VAULT,
             type(uint256).max - IERC20(WFTM).allowance(address(this), BEET_VAULT)
         ); //todo is this even needed?
+        IERC20(WFTM).safeIncreaseAllowance(
+            SPOOKY_ROUTER,
+            type(uint256).max - IERC20(WFTM).allowance(address(this), SPOOKY_ROUTER)
+        );
     }
 
     /**

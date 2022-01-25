@@ -40,7 +40,6 @@ describe("Vaults", () => {
     let strategist;
 
     beforeEach( async () => {
-        console.log("beforeEach");
         //reset network
         await network.provider.request({
             method: "hardhat_reset",
@@ -55,7 +54,6 @@ describe("Vaults", () => {
         });
 
         // get signers
-        console.log("get signers");
         [owner] = await ethers.getSigners();
         await hre.network.provider.request({
             method: "hardhat_impersonateAccount",
@@ -70,7 +68,6 @@ describe("Vaults", () => {
         selfAddress = await self.getAddress();
 
         // get artifacts
-        console.log("get artifacts");
         Strategy = await ethers.getContractFactory("ReaperAutoCompound_LiquidV2_Beethoven");
         Vault = await ethers.getContractFactory("ReaperVaultv1_3");
         Treasury = await ethers.getContractFactory("ReaperTreasury");
@@ -78,7 +75,6 @@ describe("Vaults", () => {
         PaymentRouter = await ethers.getContractFactory("PaymentRouter");
 
         //deploy contracts
-        console.log("deploy contracts");
         treasury = await Treasury.deploy();
         // want = new ethers.Contract(wantAddress, wantAbi, self);
         want = await Want.attach(wantAddress);
@@ -93,7 +89,6 @@ describe("Vaults", () => {
         );
 
         // IMPORTANT : routes must be provided in the pool's own token order
-        console.log("strategy");
         strategy = await Strategy.deploy(
             vault.address,
             [treasury.address, paymentRouterAddress],
@@ -109,19 +104,17 @@ describe("Vaults", () => {
             ]
         );
         await strategy.deployed();
-        console.log("initialize");
         await vault.initialize(strategy.address);
         await paymentRouter
             .connect(strategist)
             .addStrategy(strategy.address, [strategistAddress], [100]);
         
-        console.log("approve");
         await want
             .connect(self)
             .approve(vault.address, ethers.constants.MaxUint256);
     });
 
-    describe("Deploying the vault and strategy", () => {
+    xdescribe("Deploying the vault and strategy", () => {
         it("should initiate a vault with a 0 balance", async () => {
             const totalBalance = await vault.balance();
             const availableBalance = await vault.available();
@@ -130,6 +123,86 @@ describe("Vaults", () => {
             expect(totalBalance).to.equal(ethers.constants.Zero);
             expect(availableBalance).to.equal(ethers.constants.Zero);
             expect(pricePerFullShare).to.equal(ethers.utils.parseEther("1"));
+        });
+    });
+
+    describe("Vault Tests", () => {
+        xit("should allow deposits and account for them correctly", async () => {
+            const userBalance = await want.balanceOf(selfAddress);
+            const initialVaultBalance = await vault.balance();
+            const depositAmount = userBalance.div(2);
+
+            await vault.connect(self).deposit(depositAmount);
+            const newVaultBalance = await vault.balance();
+            const newUserBalance = await want.balanceOf(selfAddress);
+            const deductedAmount = userBalance.sub(newUserBalance);
+
+            console.log(`initialVaultBalance ${initialVaultBalance.toString()} = ethers.constants.Zero ${ethers.constants.Zero}`);
+            console.log(`newVaultBalance ${newVaultBalance.toString()} = depositAmount ${depositAmount}`);
+            console.log(`deductedAmount ${deductedAmount.toString()} = depositAmount ${depositAmount.toString()}`);
+            expect(initialVaultBalance).to.equal(ethers.constants.Zero);
+            expect(newVaultBalance).to.equal(depositAmount);
+            expect(deductedAmount).to.equal(depositAmount);
+        });
+
+        xit("should allow withdrawals", async () => {
+            const userBalance = await want.balanceOf(selfAddress);
+            const depositAmount = userBalance.div(2);
+            await vault.connect(self).deposit(depositAmount);
+      
+            const withdrawAmount = depositAmount; // .div(4);
+            await vault.connect(self).withdraw(withdrawAmount);
+      
+            const actualUserBalanceAfterWithdraw = await want.balanceOf(selfAddress);
+            const expectedUserBalanceAfterWithdraw = userBalance
+              .sub(depositAmount)
+              .add(withdrawAmount);
+            
+            console.log(
+                `actualUserBalanceAfterWithdraw ${actualUserBalanceAfterWithdraw} > expectedUserBalanceAfterWithdraw.mul(9950).div(10000) ${expectedUserBalanceAfterWithdraw.mul(9950).div(10000)}`
+            );
+            expect(actualUserBalanceAfterWithdraw).to.be.gte(
+              expectedUserBalanceAfterWithdraw.mul(9950).div(10000)
+            );
+            console.log(
+              `Withdraw fees paid is ${userBalance
+                .sub(depositAmount)
+                .add(withdrawAmount)
+                .sub(actualUserBalanceAfterWithdraw)
+                .mul(10000)
+                .div(withdrawAmount)} basis points.`
+            );
+        });
+
+        it("should provide yield", async () => {
+            const timeToSkip = 30 * 24 * 60 * 60;
+            const initialUserBalance = await want.balanceOf(selfAddress);
+            const depositAmount = initialUserBalance.div(10);
+
+            await vault.connect(self).deposit(depositAmount);
+            const initialVaultBalance = await vault.balance();
+      
+            await strategy
+              .connect(strategist)
+              .updateHarvestLogCadence(timeToSkip / 2);
+      
+            const numHarvests = 2;
+            for (let i = 0; i < numHarvests; i++) {
+              await moveTimeForward(timeToSkip);
+              console.log('ABOUT TO FAIL');
+              await strategy.harvest();
+              console.log('DID NOT FAIL');
+            }
+
+            const finalVaultBalance = await vault.balance();
+            expect(finalVaultBalance).to.be.gt(initialVaultBalance);
+      
+            const averageAPR = await strategy.averageAPRAcrossLastNHarvests(
+              numHarvests
+            );
+            console.log(
+              `Average APR across ${numHarvests} harvests is ${averageAPR} basis points.`
+            );
         });
     });
 });
