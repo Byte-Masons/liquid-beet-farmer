@@ -175,9 +175,9 @@ describe("Vaults", () => {
         });
 
         it("should provide yield", async () => {
-            const timeToSkip = 30 * 24 * 60 * 60;
+            const timeToSkip = 24 * 60 * 60;
             const initialUserBalance = await want.balanceOf(selfAddress);
-            const depositAmount = initialUserBalance.div(10);
+            const depositAmount = initialUserBalance;
 
             await vault.connect(self).deposit(depositAmount);
             const initialVaultBalance = await vault.balance();

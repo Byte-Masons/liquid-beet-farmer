@@ -230,8 +230,13 @@ contract ReaperAutoCompound_LiquidV2_Beethoven is ReaperBaseStrategy {
             uint256 tokenBal = wftmToSwap;
             console.log('------ tokenBal in wftm: ', tokenBal);
             if (token != WFTM) {
+                console.log('------ token: ', token);
+                address route0 = wftmToUnderlyingRoute[token][0];
+                console.log('------ route0: ', route0);
+                address route1 = wftmToUnderlyingRoute[token][1];
+                console.log('------ route1: ', route1);
                 IUniswapV2Router(SPOOKY_ROUTER).swapExactTokensForTokensSupportingFeeOnTransferTokens(
-                    wftmToSwap,
+                    tokenBal,
                     0,
                     wftmToUnderlyingRoute[token],
                     address(this),
