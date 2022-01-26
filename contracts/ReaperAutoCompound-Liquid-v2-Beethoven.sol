@@ -38,7 +38,7 @@ contract ReaperAutoCompound_LiquidV2_Beethoven is ReaperBaseStrategy {
     /**
      * @dev Third Party Contracts:
      * {MASTER_CHEF} - masterChef for pools. -> LQDR
-     * {BEET_VAULT} - Beethoven vault - core contract of balancer protocol //todo is it really necessary ?
+     * {BEET_VAULT} - Beethoven vault - core contract of balancer protocol
      */
     address public constant MASTER_CHEF = address(0x6e2ad6527901c9664f016466b8DA1357a004db0f);
     address public constant BEET_VAULT = address(0x20dd72Ed959b6147912C2e529F0a0C651c33c9ce);
@@ -230,12 +230,6 @@ contract ReaperAutoCompound_LiquidV2_Beethoven is ReaperBaseStrategy {
                 address(this),
                 block.timestamp + 600
             );
-            IERC20(token).safeIncreaseAllowance(BEET_VAULT, IERC20(token).balanceOf(address(this)));
-        }
-
-        // wftm balance left should match its weight
-        if (hasUnderlyingWftm) {
-            IERC20(WFTM).safeIncreaseAllowance(BEET_VAULT, IERC20(WFTM).balanceOf(address(this)));
         }
 
         _joinWeightedPool();
@@ -283,7 +277,7 @@ contract ReaperAutoCompound_LiquidV2_Beethoven is ReaperBaseStrategy {
     }
 
     function balanceOfPool() public view returns (uint256) {
-        (uint256 _amount, ) = IMasterChef(MASTER_CHEF).userInfo(poolId, address(this));
+        (uint256 _amount, ) = IMasterChefv2(MASTER_CHEF).userInfo(poolId, address(this));
         return _amount;
     }
 
@@ -293,7 +287,13 @@ contract ReaperAutoCompound_LiquidV2_Beethoven is ReaperBaseStrategy {
      */
     function retireStrat() external {
         require(msg.sender == vault, '!vault');
-        //todo withdraw funds
+
+        IMasterChefv2(MASTER_CHEF).withdrawAndHarvest(poolId, balanceOfPool(), address(this));
+
+        uint256 rewardTokenBal = IERC20(REWARD_TOKEN).balanceOf(address(this));    
+        uint256 bpTokenBal = IERC20(bpToken).balanceOf(address(this));
+        IERC20(REWARD_TOKEN).transfer(vault, rewardTokenBal);
+        IERC20(bpToken).transfer(vault, bpTokenBal);
     }
 
     /**
@@ -303,7 +303,7 @@ contract ReaperAutoCompound_LiquidV2_Beethoven is ReaperBaseStrategy {
     function panic() public {
         _onlyStrategistOrOwner();
         pause();
-        // todo withdraw funds asap
+        IMasterChefv2(MASTER_CHEF).emergencyWithdraw(poolId, address(this));
     }
 
     /**
@@ -343,12 +343,41 @@ contract ReaperAutoCompound_LiquidV2_Beethoven is ReaperBaseStrategy {
             SPOOKY_ROUTER,
             type(uint256).max - IERC20(WFTM).allowance(address(this), SPOOKY_ROUTER)
         );
+        for (uint256 i; i < totalUnderlyingTokens; i++) {
+            
+                IERC20(bptUnderlyingTokens[i])
+                .safeIncreaseAllowance(
+                    BEET_VAULT,
+                    type(uint256).max - IERC20(bptUnderlyingTokens[i]).allowance(address(this), BEET_VAULT)
+                );
+            
+        }
     }
 
     /**
      * @dev Set all allowances to 0
      */
     function _removeAllowances() internal {
-        //todo remove all allowances
+        IERC20(bpToken).safeDecreaseAllowance(
+            MASTER_CHEF,
+            IERC20(bpToken).allowance(address(this), MASTER_CHEF)
+        );
+        IERC20(REWARD_TOKEN).safeDecreaseAllowance(
+            SPIRIT_ROUTER,
+            IERC20(REWARD_TOKEN).allowance(address(this), SPIRIT_ROUTER)
+        );
+        IERC20(WFTM).safeDecreaseAllowance(
+            SPOOKY_ROUTER,
+            IERC20(WFTM).allowance(address(this),SPOOKY_ROUTER)
+        );
+        for (uint256 i; i < totalUnderlyingTokens; i++) {
+            
+                IERC20(bptUnderlyingTokens[i])
+                .safeDecreaseAllowance(
+                    BEET_VAULT,
+                    IERC20(bptUnderlyingTokens[i]).allowance(address(this), BEET_VAULT)
+                );
+            
+        }
     }
 }
