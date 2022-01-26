@@ -30,8 +30,7 @@ contract ReaperAutoCompound_LiquidV2_Beethoven is ReaperBaseStrategy {
     address public constant WFTM = address(0x21be370D5312f44cB42ce377BC9b8a0cEF1A4C83);
     address public constant REWARD_TOKEN = address(0x10b620b2dbAC4Faa7D7FFD71Da486f5D44cd86f9);
     address public bpToken;
-    // mapping(uint256 => address) public bptUnderlyingTokens;
-    address[] public bptUnderlyingTokens = new address[](8);
+    address[] public bptUnderlyingTokens;
 
     uint256 public totalUnderlyingTokens;
 
@@ -95,7 +94,7 @@ contract ReaperAutoCompound_LiquidV2_Beethoven is ReaperBaseStrategy {
 
         totalUnderlyingTokens = _bpTokens.length;
         for (uint256 i; i < totalUnderlyingTokens; i++) {
-            bptUnderlyingTokens[i] = address(_bpTokens[i]);
+            bptUnderlyingTokens.push(address(_bpTokens[i]));
             if (bptUnderlyingTokens[i] == WFTM) {
                 wftmToUnderlyingRoute[WFTM] = [WFTM];
                 underlyingToWeight[WFTM] = _ratios[i];
