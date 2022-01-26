@@ -26,16 +26,22 @@ describe("Vaults", () => {
     //Benefactors
     const rewardHolderAddress = "0x078E88E465f2a430399E319d57543A7A76E97668";
 
+    // Masterchef and tools to get pending rewards
+    const masterChefAddress = "0x6e2ad6527901c9664f016466b8DA1357a004db0f";
+    const poolId = 31;
+
     let Vault;
     let Strategy;
     let Treasury;
     let Want;
     let PaymentRouter;
+    let MasterChef;
 
     let vault;
     let strategy;
     let treasury;
     let paymentRouter;
+    let masterChef;
 
     let want;
     let self;
@@ -98,6 +104,7 @@ describe("Vaults", () => {
             0,
             ethers.constants.MaxUint256
         );
+        masterChef = await ethers.getContractAt("IMasterChefv2",masterChefAddress);
 
         // IMPORTANT : routes must be provided in the pool's own token order
         strategy = await Strategy.deploy(
@@ -105,7 +112,7 @@ describe("Vaults", () => {
             [treasury.address, paymentRouterAddress],
             [strategistAddress],
             wantAddress,
-            31,
+            poolId,
             [2500,2500,2500,2500],
             [
                 [wftmAddress, usdcAddress],
@@ -201,7 +208,8 @@ describe("Vaults", () => {
             // const benefactorRewardBalance = await reward.balanceOf(rewardHolderAddress);
             for (let i = 0; i < numHarvests; i++) {
               await moveTimeForward(timeToSkip);
-            //   await reward.connect(rewardHolder).transfer(strategy.address ,benefactorRewardBalance.div(6));
+              // await reward.connect(rewardHolder).transfer(strategy.address ,benefactorRewardBalance.div(6));
+              console.log(`pending lqdr reward: ${await masterChef.pendingLqdr(poolId, strategy.address)}`);
               await strategy.harvest();
             }
 
@@ -223,5 +231,5 @@ describe("Vaults", () => {
         xit("should allow pausing and then unpausing", async () => {});
 
         xit("should allow panic", async () => {});
-    }) 
+    });
 });
