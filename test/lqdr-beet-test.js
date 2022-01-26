@@ -113,13 +113,7 @@ describe("Vaults", () => {
             [strategistAddress],
             wantAddress,
             poolId,
-            [2500,2500,2500,2500],
-            [
-                [wftmAddress, usdcAddress],
-                [wftmAddress],
-                [wftmAddress, wbtcAddress],
-                [wftmAddress, wethAddress]
-            ]
+            [2500,2500,2500,2500]
         );
         await strategy.deployed();
         await vault.initialize(strategy.address);

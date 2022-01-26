@@ -68,7 +68,6 @@ contract ReaperAutoCompound_LiquidV2_Beethoven is ReaperBaseStrategy {
      * @param _bpToken Token staked in the farm
      * @param _poolId Masterchef pool id => Liquid Masterchef
      * @param _ratios weight of each underlying token
-     * @param _routes swap routes to go from wftm to each underlying token
      */
     constructor(
         address _vault,
@@ -76,10 +75,8 @@ contract ReaperAutoCompound_LiquidV2_Beethoven is ReaperBaseStrategy {
         address[] memory _strategists,
         address _bpToken,
         uint256 _poolId,
-        uint256[] memory _ratios,
-        address[][] memory _routes
+        uint256[] memory _ratios
     ) ReaperBaseStrategy(_vault, _feeRemitters, _strategists) {
-        require(_ratios.length == _routes.length, CONSTRUCTOR_ERROR);
 
         bpToken = _bpToken;
         poolId = _poolId;
@@ -95,7 +92,7 @@ contract ReaperAutoCompound_LiquidV2_Beethoven is ReaperBaseStrategy {
             if (bptUnderlyingTokens[i] == WFTM) {
                 wftmToUnderlyingRoute[WFTM] = [WFTM];
             } else {
-                wftmToUnderlyingRoute[bptUnderlyingTokens[i]] = _routes[i];
+                wftmToUnderlyingRoute[bptUnderlyingTokens[i]] = [WFTM,bptUnderlyingTokens[i]];
             }
             underlyingToWeight[bptUnderlyingTokens[i]] = _ratios[i];
         }
@@ -264,6 +261,16 @@ contract ReaperAutoCompound_LiquidV2_Beethoven is ReaperBaseStrategy {
 
         // Send request to the vault
         IVault(BEET_VAULT).joinPool(poolID_bytes, address(this), address(this), request);
+    }
+
+    /**
+     * @dev Set new route to swap from wftm to a token
+     * Does not check that token is an underlying
+     */
+    function setWftmToUnderlyingSwapRoute(address _token, address[] memory _route) external {
+        _onlyStrategistOrOwner();
+        require(_route[0] == WFTM && _route[_route.length - 1 ] == _token);
+        wftmToUnderlyingRoute[_token] = _route;
     }
 
     //todo function to fetch the pool token weights with : pool.getNormalizedWeights();
