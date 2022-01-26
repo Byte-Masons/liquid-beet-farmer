@@ -12,6 +12,7 @@ const moveTimeForward = async (seconds) => {
 
 describe("Vaults", () => {
     const wantAddress = "0xf3A602d30dcB723A74a0198313a7551FEacA7DAc"; // bpToken - A Late Quartet
+    const rewardAddress = "0x10b620b2dbAC4Faa7D7FFD71Da486f5D44cd86f9"; // Liquid
     const wantHolderAddress = "0xf335947Fd2BB811cEa6fBce43847fcEff8Ad2e62"; // pray you don't have to change that, or buy some yourself
     const paymentRouterAddress = "0x603e60D22af05ff77FDCf05c063f582C40e55aae";
     const strategistAddress = "0x1E71AEE6081f62053123140aacC7a06021D77348";
@@ -21,6 +22,9 @@ describe("Vaults", () => {
     const wftmAddress = "0x21be370D5312f44cB42ce377BC9b8a0cEF1A4C83";
     const wbtcAddress = "0x321162Cd933E2Be498Cd2267a90534A804051b11";
     const wethAddress = "0x74b23882a30290451A17c44f4F05243b6b58C76d";
+
+    //Benefactors
+    const rewardHolderAddress = "0x078E88E465f2a430399E319d57543A7A76E97668";
 
     let Vault;
     let Strategy;
@@ -38,9 +42,9 @@ describe("Vaults", () => {
     let selfAddress;
     let owner;
     let strategist;
+    let rewardHolder;
 
     beforeEach( async () => {
-        console.log("beforeEach");
         //reset network
         await network.provider.request({
             method: "hardhat_reset",
@@ -55,7 +59,6 @@ describe("Vaults", () => {
         });
 
         // get signers
-        console.log("get signers");
         [owner] = await ethers.getSigners();
         await hre.network.provider.request({
             method: "hardhat_impersonateAccount",
@@ -65,12 +68,16 @@ describe("Vaults", () => {
             method: "hardhat_impersonateAccount",
             params: [strategistAddress],
         });
+        await hre.network.provider.request({
+            method: "hardhat_impersonateAccount",
+            params: [rewardHolderAddress],
+        });
         self = await ethers.provider.getSigner(wantHolderAddress);
         strategist = await ethers.provider.getSigner(strategistAddress);
+        rewardHolder = await ethers.provider.getSigner(rewardHolderAddress);
         selfAddress = await self.getAddress();
 
         // get artifacts
-        console.log("get artifacts");
         Strategy = await ethers.getContractFactory("ReaperAutoCompound_LiquidV2_Beethoven");
         Vault = await ethers.getContractFactory("ReaperVaultv1_3");
         Treasury = await ethers.getContractFactory("ReaperTreasury");
@@ -78,10 +85,10 @@ describe("Vaults", () => {
         PaymentRouter = await ethers.getContractFactory("PaymentRouter");
 
         //deploy contracts
-        console.log("deploy contracts");
         treasury = await Treasury.deploy();
         // want = new ethers.Contract(wantAddress, wantAbi, self);
         want = await Want.attach(wantAddress);
+        reward = await Want.attach(rewardAddress);
         paymentRouter = await PaymentRouter.attach(paymentRouterAddress);
         vault = await Vault.deploy(
             wantAddress,
@@ -93,7 +100,6 @@ describe("Vaults", () => {
         );
 
         // IMPORTANT : routes must be provided in the pool's own token order
-        console.log("strategy");
         strategy = await Strategy.deploy(
             vault.address,
             [treasury.address, paymentRouterAddress],
@@ -109,19 +115,17 @@ describe("Vaults", () => {
             ]
         );
         await strategy.deployed();
-        console.log("initialize");
         await vault.initialize(strategy.address);
         await paymentRouter
             .connect(strategist)
             .addStrategy(strategy.address, [strategistAddress], [100]);
         
-        console.log("approve");
         await want
             .connect(self)
             .approve(vault.address, ethers.constants.MaxUint256);
     });
 
-    describe("Deploying the vault and strategy", () => {
+    xdescribe("Deploying the vault and strategy", () => {
         it("should initiate a vault with a 0 balance", async () => {
             const totalBalance = await vault.balance();
             const availableBalance = await vault.available();
@@ -132,4 +136,92 @@ describe("Vaults", () => {
             expect(pricePerFullShare).to.equal(ethers.utils.parseEther("1"));
         });
     });
+
+    describe("Vault Tests", () => {
+        xit("should allow deposits and account for them correctly", async () => {
+            const userBalance = await want.balanceOf(selfAddress);
+            const initialVaultBalance = await vault.balance();
+            const depositAmount = userBalance.div(2);
+
+            await vault.connect(self).deposit(depositAmount);
+            const newVaultBalance = await vault.balance();
+            const newUserBalance = await want.balanceOf(selfAddress);
+            const deductedAmount = userBalance.sub(newUserBalance);
+
+            console.log(`initialVaultBalance ${initialVaultBalance.toString()} = ethers.constants.Zero ${ethers.constants.Zero}`);
+            console.log(`newVaultBalance ${newVaultBalance.toString()} = depositAmount ${depositAmount}`);
+            console.log(`deductedAmount ${deductedAmount.toString()} = depositAmount ${depositAmount.toString()}`);
+            expect(initialVaultBalance).to.equal(ethers.constants.Zero);
+            expect(newVaultBalance).to.equal(depositAmount);
+            expect(deductedAmount).to.equal(depositAmount);
+        });
+
+        xit("should allow withdrawals", async () => {
+            const userBalance = await want.balanceOf(selfAddress);
+            const depositAmount = userBalance.div(2);
+            await vault.connect(self).deposit(depositAmount);
+      
+            const withdrawAmount = depositAmount; // .div(4);
+            await vault.connect(self).withdraw(withdrawAmount);
+      
+            const actualUserBalanceAfterWithdraw = await want.balanceOf(selfAddress);
+            const expectedUserBalanceAfterWithdraw = userBalance
+              .sub(depositAmount)
+              .add(withdrawAmount);
+            
+            console.log(
+                `actualUserBalanceAfterWithdraw ${actualUserBalanceAfterWithdraw} > expectedUserBalanceAfterWithdraw.mul(9950).div(10000) ${expectedUserBalanceAfterWithdraw.mul(9950).div(10000)}`
+            );
+            expect(actualUserBalanceAfterWithdraw).to.be.gte(
+              expectedUserBalanceAfterWithdraw.mul(9950).div(10000)
+            );
+            console.log(
+              `Withdraw fees paid is ${userBalance
+                .sub(depositAmount)
+                .add(withdrawAmount)
+                .sub(actualUserBalanceAfterWithdraw)
+                .mul(10000)
+                .div(withdrawAmount)} basis points.`
+            );
+        });
+
+        it("should provide yield", async () => {
+            const timeToSkip = 60 * 60;
+            const initialUserBalance = await want.balanceOf(selfAddress);
+            const depositAmount = initialUserBalance;
+
+            await vault.connect(self).deposit(depositAmount);
+            const initialVaultBalance = await vault.balance();
+      
+            await strategy
+              .connect(strategist)
+              .updateHarvestLogCadence(timeToSkip / 2);
+      
+            const numHarvests = 5;
+            // const benefactorRewardBalance = await reward.balanceOf(rewardHolderAddress);
+            for (let i = 0; i < numHarvests; i++) {
+              await moveTimeForward(timeToSkip);
+            //   await reward.connect(rewardHolder).transfer(strategy.address ,benefactorRewardBalance.div(6));
+              await strategy.harvest();
+            }
+
+            const finalVaultBalance = await vault.balance();
+            expect(finalVaultBalance).to.be.gt(initialVaultBalance);
+      
+            const averageAPR = await strategy.averageAPRAcrossLastNHarvests(
+              numHarvests - 1
+            );
+            console.log(
+              `Average APR across ${numHarvests} harvests is ${averageAPR} basis points.`
+            );
+        });
+
+        xit("should allow updating the strategy", async () => {});
+    });
+
+    describe("Strategy Tests", () => {
+        xit("should allow pausing and then unpausing", async () => {});
+
+        xit("should allow panic", async () => {});
+    }) 
 });
