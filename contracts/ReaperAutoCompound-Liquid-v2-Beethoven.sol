@@ -30,8 +30,7 @@ contract ReaperAutoCompound_LiquidV2_Beethoven is ReaperBaseStrategy {
     address public constant WFTM = address(0x21be370D5312f44cB42ce377BC9b8a0cEF1A4C83);
     address public constant REWARD_TOKEN = address(0x10b620b2dbAC4Faa7D7FFD71Da486f5D44cd86f9);
     address public bpToken;
-    // mapping(uint256 => address) public bptUnderlyingTokens;
-    address[] public bptUnderlyingTokens = new address[](8);
+    address[] public bptUnderlyingTokens;
 
     uint256 public totalUnderlyingTokens;
 
@@ -62,7 +61,6 @@ contract ReaperAutoCompound_LiquidV2_Beethoven is ReaperBaseStrategy {
 
     string constant CONSTRUCTOR_ERROR = 'constructor error';
     uint256 constant MINIMUM_BPT = 1; //virtually ensures we can always get the desired BPT
-    bool hasUnderlyingWftm;
 
     /**
      * @dev Initializes the strategy. Sets parameters, saves routes, and gives allowances.
@@ -95,15 +93,13 @@ contract ReaperAutoCompound_LiquidV2_Beethoven is ReaperBaseStrategy {
 
         totalUnderlyingTokens = _bpTokens.length;
         for (uint256 i; i < totalUnderlyingTokens; i++) {
-            bptUnderlyingTokens[i] = address(_bpTokens[i]);
+            bptUnderlyingTokens.push(address(_bpTokens[i]));
             if (bptUnderlyingTokens[i] == WFTM) {
                 wftmToUnderlyingRoute[WFTM] = [WFTM];
-                underlyingToWeight[WFTM] = _ratios[i];
-                hasUnderlyingWftm = true;
             } else {
                 wftmToUnderlyingRoute[bptUnderlyingTokens[i]] = _routes[i];
-                underlyingToWeight[bptUnderlyingTokens[i]] = _ratios[i];
             }
+            underlyingToWeight[bptUnderlyingTokens[i]] = _ratios[i];
         }
 
         _giveAllowances();
@@ -218,34 +214,32 @@ contract ReaperAutoCompound_LiquidV2_Beethoven is ReaperBaseStrategy {
      * @dev Request {bpToken} to the {BEET_VAULT} based on underlying tokens balances
      */
     function _addLiquidity() internal {
-        console.log('---- ADD LIQUIDITY IN');
+        bool hasUnderlyingWftm = false;
         uint256 wftmBal = IERC20(WFTM).balanceOf(address(this));
 
         for (uint256 i; i < totalUnderlyingTokens; i++) {
-            console.log('----- LOOPING');
             address token = bptUnderlyingTokens[i];
-            uint256 wftmToSwap = (wftmBal * underlyingToWeight[token]) / PERCENT_DIVISOR;
-            // wftmBal -= wftmToSwap;
-
-            uint256 tokenBal = wftmToSwap;
-            console.log('------ tokenBal in wftm: ', tokenBal);
-            if (token != WFTM) {
-                console.log('------ token: ', token);
-                address route0 = wftmToUnderlyingRoute[token][0];
-                console.log('------ route0: ', route0);
-                address route1 = wftmToUnderlyingRoute[token][1];
-                console.log('------ route1: ', route1);
-                IUniswapV2Router(SPOOKY_ROUTER).swapExactTokensForTokensSupportingFeeOnTransferTokens(
-                    tokenBal,
-                    0,
-                    wftmToUnderlyingRoute[token],
-                    address(this),
-                    block.timestamp + 600
-                );
-                tokenBal = IERC20(token).balanceOf(address(this));
-                console.log('------- tokenBal in token: ', tokenBal);
-                IERC20(token).safeIncreaseAllowance(BEET_VAULT, tokenBal);
+            if (token == WFTM) {
+                hasUnderlyingWftm = true;
+                continue;
             }
+
+            uint256 wftmToSwap = (wftmBal * underlyingToWeight[token]) / PERCENT_DIVISOR;
+            uint256 amountOut = IUniswapV2Router(SPOOKY_ROUTER).getAmountsOut(wftmToSwap, wftmToUnderlyingRoute[token])[
+                1
+            ];
+            if (amountOut == 0) {
+                continue;
+            }
+
+            IUniswapV2Router(SPOOKY_ROUTER).swapExactTokensForTokensSupportingFeeOnTransferTokens(
+                wftmToSwap,
+                0,
+                wftmToUnderlyingRoute[token],
+                address(this),
+                block.timestamp + 600
+            );
+            IERC20(token).safeIncreaseAllowance(BEET_VAULT, IERC20(token).balanceOf(address(this)));
         }
 
         // wftm balance left should match its weight
@@ -253,9 +247,7 @@ contract ReaperAutoCompound_LiquidV2_Beethoven is ReaperBaseStrategy {
             IERC20(WFTM).safeIncreaseAllowance(BEET_VAULT, IERC20(WFTM).balanceOf(address(this)));
         }
 
-        console.log('----- join weighted pool');
         _joinWeightedPool();
-        console.log('---- ADD LIQUIDITY OUT');
     }
 
     function _joinWeightedPool() internal {
@@ -360,10 +352,10 @@ contract ReaperAutoCompound_LiquidV2_Beethoven is ReaperBaseStrategy {
             BEET_VAULT,
             type(uint256).max - IERC20(REWARD_TOKEN).allowance(address(this), BEET_VAULT)
         ); //todo is this even needed?
-        IERC20(WFTM).safeIncreaseAllowance(
-            BEET_VAULT,
-            type(uint256).max - IERC20(WFTM).allowance(address(this), BEET_VAULT)
-        ); //todo is this even needed?
+        // IERC20(WFTM).safeIncreaseAllowance(
+        //     BEET_VAULT,
+        //     type(uint256).max - IERC20(WFTM).allowance(address(this), BEET_VAULT)
+        // ); //todo is this even needed?
         IERC20(WFTM).safeIncreaseAllowance(
             SPOOKY_ROUTER,
             type(uint256).max - IERC20(WFTM).allowance(address(this), SPOOKY_ROUTER)
