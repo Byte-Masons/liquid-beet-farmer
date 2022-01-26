@@ -100,7 +100,7 @@ describe("Vaults", () => {
             wantAddress,
             "A Late Quartet Beethoven-Liquid Crypt",
             "rfLQUARTET",
-            432000,
+            0,
             0,
             ethers.constants.MaxUint256
         );
@@ -186,7 +186,7 @@ describe("Vaults", () => {
             );
         });
 
-        it("should provide yield", async () => {
+        xit("should provide yield", async () => {
             const timeToSkip = 60 * 60;
             const initialUserBalance = await want.balanceOf(selfAddress);
             const depositAmount = initialUserBalance;
@@ -218,7 +218,24 @@ describe("Vaults", () => {
             );
         });
 
-        xit("should allow updating the strategy", async () => {});
+        it("should allow updating the strategy", async () => {
+            const newStrategy = await Strategy.deploy(
+                vault.address,
+                [treasury.address, paymentRouterAddress],
+                [strategistAddress],
+                wantAddress,
+                poolId,
+                [2500,2500,2500,2500]
+            );
+
+            await vault.proposeStrat(newStrategy.address);
+            await vault.upgradeStrat();
+
+            const newVaultStrategyAddress = await vault.strategy();
+            console.log(`newStrategy.address ${newStrategy.address} == newVaultStrategyAddress ${newVaultStrategyAddress}`);
+            expect(newStrategy.address).to.be.equal(newVaultStrategyAddress);
+            
+        });
     });
 
     describe("Strategy Tests", () => {
