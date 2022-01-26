@@ -12,6 +12,7 @@ const moveTimeForward = async (seconds) => {
 
 describe("Vaults", () => {
     const wantAddress = "0xf3A602d30dcB723A74a0198313a7551FEacA7DAc"; // bpToken - A Late Quartet
+    const rewardAddress = "0x10b620b2dbAC4Faa7D7FFD71Da486f5D44cd86f9"; // Liquid
     const wantHolderAddress = "0xf335947Fd2BB811cEa6fBce43847fcEff8Ad2e62"; // pray you don't have to change that, or buy some yourself
     const paymentRouterAddress = "0x603e60D22af05ff77FDCf05c063f582C40e55aae";
     const strategistAddress = "0x1E71AEE6081f62053123140aacC7a06021D77348";
@@ -21,6 +22,9 @@ describe("Vaults", () => {
     const wftmAddress = "0x21be370D5312f44cB42ce377BC9b8a0cEF1A4C83";
     const wbtcAddress = "0x321162Cd933E2Be498Cd2267a90534A804051b11";
     const wethAddress = "0x74b23882a30290451A17c44f4F05243b6b58C76d";
+
+    //Benefactors
+    const rewardHolderAddress = "0x078E88E465f2a430399E319d57543A7A76E97668";
 
     let Vault;
     let Strategy;
@@ -38,6 +42,7 @@ describe("Vaults", () => {
     let selfAddress;
     let owner;
     let strategist;
+    let rewardHolder;
 
     beforeEach( async () => {
         //reset network
@@ -63,8 +68,13 @@ describe("Vaults", () => {
             method: "hardhat_impersonateAccount",
             params: [strategistAddress],
         });
+        await hre.network.provider.request({
+            method: "hardhat_impersonateAccount",
+            params: [rewardHolderAddress],
+        });
         self = await ethers.provider.getSigner(wantHolderAddress);
         strategist = await ethers.provider.getSigner(strategistAddress);
+        rewardHolder = await ethers.provider.getSigner(rewardHolderAddress);
         selfAddress = await self.getAddress();
 
         // get artifacts
@@ -78,6 +88,7 @@ describe("Vaults", () => {
         treasury = await Treasury.deploy();
         // want = new ethers.Contract(wantAddress, wantAbi, self);
         want = await Want.attach(wantAddress);
+        reward = await Want.attach(rewardAddress);
         paymentRouter = await PaymentRouter.attach(paymentRouterAddress);
         vault = await Vault.deploy(
             wantAddress,
@@ -175,7 +186,7 @@ describe("Vaults", () => {
         });
 
         it("should provide yield", async () => {
-            const timeToSkip = 24 * 60 * 60;
+            const timeToSkip = 60 * 60;
             const initialUserBalance = await want.balanceOf(selfAddress);
             const depositAmount = initialUserBalance;
 
@@ -186,23 +197,31 @@ describe("Vaults", () => {
               .connect(strategist)
               .updateHarvestLogCadence(timeToSkip / 2);
       
-            const numHarvests = 2;
+            const numHarvests = 5;
+            // const benefactorRewardBalance = await reward.balanceOf(rewardHolderAddress);
             for (let i = 0; i < numHarvests; i++) {
               await moveTimeForward(timeToSkip);
-              console.log('ABOUT TO FAIL');
+            //   await reward.connect(rewardHolder).transfer(strategy.address ,benefactorRewardBalance.div(6));
               await strategy.harvest();
-              console.log('DID NOT FAIL');
             }
 
             const finalVaultBalance = await vault.balance();
             expect(finalVaultBalance).to.be.gt(initialVaultBalance);
       
             const averageAPR = await strategy.averageAPRAcrossLastNHarvests(
-              numHarvests
+              numHarvests - 1
             );
             console.log(
               `Average APR across ${numHarvests} harvests is ${averageAPR} basis points.`
             );
         });
+
+        xit("should allow updating the strategy", async () => {});
     });
+
+    describe("Strategy Tests", () => {
+        xit("should allow pausing and then unpausing", async () => {});
+
+        xit("should allow panic", async () => {});
+    }) 
 });

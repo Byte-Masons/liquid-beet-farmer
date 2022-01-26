@@ -2,8 +2,6 @@
 
 pragma solidity 0.8.9;
 
-import 'hardhat/console.sol';
-
 import './ReaperBaseStrategy.sol';
 import './interfaces/IBasePool.sol';
 import './interfaces/IBaseWeightedPool.sol';
@@ -149,18 +147,11 @@ contract ReaperAutoCompound_LiquidV2_Beethoven is ReaperBaseStrategy {
      * 5. It deposits the new stakedTokens.
      */
     function _harvestCore() internal override whenNotPaused {
-        console.log('-- HARVEST IN');
         IMasterChefv2(MASTER_CHEF).harvest(poolId, address(this));
-        console.log('--- claim rewards done');
         _swapRewardToWftm();
-        console.log('--- swap rewards to wftm done');
         _chargeFees();
-        console.log('--- charge fees done');
         _addLiquidity();
-        console.log('--- add liquidity done');
         deposit();
-        console.log('--- deposit done');
-        console.log('-- HARVEST OUT');
     }
 
     /**
@@ -348,14 +339,6 @@ contract ReaperAutoCompound_LiquidV2_Beethoven is ReaperBaseStrategy {
             SPIRIT_ROUTER,
             type(uint256).max - IERC20(REWARD_TOKEN).allowance(address(this), SPIRIT_ROUTER)
         );
-        IERC20(REWARD_TOKEN).safeIncreaseAllowance(
-            BEET_VAULT,
-            type(uint256).max - IERC20(REWARD_TOKEN).allowance(address(this), BEET_VAULT)
-        ); //todo is this even needed?
-        // IERC20(WFTM).safeIncreaseAllowance(
-        //     BEET_VAULT,
-        //     type(uint256).max - IERC20(WFTM).allowance(address(this), BEET_VAULT)
-        // ); //todo is this even needed?
         IERC20(WFTM).safeIncreaseAllowance(
             SPOOKY_ROUTER,
             type(uint256).max - IERC20(WFTM).allowance(address(this), SPOOKY_ROUTER)
