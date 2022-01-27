@@ -153,7 +153,7 @@ contract ReaperAutoCompound_LiquidV2_Beethoven is ReaperBaseStrategy {
      */
     function estimateHarvest() external view virtual override returns (uint256 profit, uint256 callFeeAmount) {
         uint256 wftmFromProfit = IUniswapV2Router(SPIRIT_ROUTER).getAmountsOut(
-            IMasterChefv2(MASTER_CHEF).pendingLqdr(poolId, address(this));,
+            IMasterChefv2(MASTER_CHEF).pendingLqdr(poolId, address(this)),
             rewardTokenToWftmRoute
         )[1];
         profit = (wftmFromProfit * totalFee) / PERCENT_DIVISOR;
