@@ -25,6 +25,7 @@ module.exports = {
       forking: {
         url: "https://rpc.ftm.tools/",
         accounts: [devAccount],
+        blockNumber: 29218651,
       },
       mining: {
         auto: true,

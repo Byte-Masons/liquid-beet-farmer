@@ -99,7 +99,7 @@ describe("Vaults", () => {
         vault = await Vault.deploy(
             wantAddress,
             "A Late Quartet Beethoven-Liquid Crypt",
-            "rfLQUARTET",
+            "rf-LQUARTET",
             0,
             0,
             ethers.constants.MaxUint256
