@@ -1,19 +1,23 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.9;
+pragma solidity ^0.8.0;
 
-import '@openzeppelin/contracts/access/AccessControlEnumerable.sol';
-import '@openzeppelin/contracts/security/Pausable.sol';
-import '@openzeppelin/contracts/utils/Address.sol';
-import './interfaces/IPaymentRouter.sol';
+import "./interfaces/IStrategy.sol";
+import "@openzeppelin/contracts/access/AccessControlEnumerable.sol";
+import "@openzeppelin/contracts/security/Pausable.sol";
+import "@openzeppelin/contracts/utils/Address.sol";
 
-abstract contract ReaperBaseStrategy is AccessControlEnumerable, Pausable {
+abstract contract ReaperBaseStrategy is
+    AccessControlEnumerable,
+    Pausable,
+    IStrategy
+{
     uint256 public constant PERCENT_DIVISOR = 10_000;
     uint256 public constant ONE_YEAR = 365 days;
 
     struct Harvest {
         uint256 timestamp;
-        uint256 profit;
+        int256 profit;
         uint256 tvl; // doesn't include profit
         uint256 timeSinceLastHarvest;
     }
@@ -25,8 +29,9 @@ abstract contract ReaperBaseStrategy is AccessControlEnumerable, Pausable {
     /**
      * Reaper Roles
      */
-    bytes32 public constant STRATEGIST = keccak256('STRATEGIST');
-    bytes32 public constant STRATEGIST_MULTISIG = keccak256('STRATEGIST_MULTISIG');
+    bytes32 public constant STRATEGIST = keccak256("STRATEGIST");
+    bytes32 public constant STRATEGIST_MULTISIG =
+        keccak256("STRATEGIST_MULTISIG");
 
     /**
      * @dev Reaper contracts:
@@ -44,9 +49,12 @@ abstract contract ReaperBaseStrategy is AccessControlEnumerable, Pausable {
      * {MAX_FEE} - Maximum fee allowed by the strategy. Hard-capped at 10%.
      * {STRATEGIST_MAX_FEE} - Maximum strategist fee allowed by the strategy (as % of treasury fee).
      *                        Hard-capped at 50%
+     * {MAX_SECURITY_FEE} - Maximum security fee charged on withdrawal to prevent
+     *                      flash deposit/harvest attacks.
      */
     uint256 public constant MAX_FEE = 1000;
     uint256 public constant STRATEGIST_MAX_FEE = 5000;
+    uint256 public constant MAX_SECURITY_FEE = 10;
 
     /**
      * @dev Distribution of fees earned, expressed as % of the profit from each harvest.
@@ -73,7 +81,11 @@ abstract contract ReaperBaseStrategy is AccessControlEnumerable, Pausable {
      * {StrategistRemitterUpdated} Event that is fired each time the strategistRemitter address is updated.
      */
     event TotalFeeUpdated(uint256 newFee);
-    event FeesUpdated(uint256 newCallFee, uint256 newTreasuryFee, uint256 newStrategistFee);
+    event FeesUpdated(
+        uint256 newCallFee,
+        uint256 newTreasuryFee,
+        uint256 newStrategistFee
+    );
     event StratHarvest(address indexed harvester);
     event StrategistRemitterUpdated(address newStrategistRemitter);
 
@@ -97,18 +109,29 @@ abstract contract ReaperBaseStrategy is AccessControlEnumerable, Pausable {
      * @dev harvest() function that takes care of logging. Subcontracts should
      *      override _harvestCore() and implement their specific logic in it.
      */
-    function harvest() external whenNotPaused {
+    function harvest() external override whenNotPaused {
         uint256 startingTvl = balanceOf();
 
         _harvestCore();
 
         if (
-            harvestLog.length == 0 || block.timestamp >= harvestLog[harvestLog.length - 1].timestamp + harvestLogCadence
+            harvestLog.length == 0 ||
+            block.timestamp >=
+            harvestLog[harvestLog.length - 1].timestamp + harvestLogCadence
         ) {
+            uint256 endingTvl = balanceOf();
+            int256 profit;
+
+            if (endingTvl < startingTvl) {
+                profit = -int256(startingTvl - endingTvl);
+            } else {
+                profit = int256(endingTvl - startingTvl);
+            }
+
             harvestLog.push(
                 Harvest({
                     timestamp: block.timestamp,
-                    profit: balanceOf() - startingTvl,
+                    profit: profit,
                     tvl: startingTvl,
                     timeSinceLastHarvest: block.timestamp - lastHarvestTimestamp
                 })
@@ -126,7 +149,11 @@ abstract contract ReaperBaseStrategy is AccessControlEnumerable, Pausable {
     /**
      * @dev Returns a slice of the harvest log containing the _n latest harvests.
      */
-    function latestHarvestLogSlice(uint256 _n) external view returns (Harvest[] memory slice) {
+    function latestHarvestLogSlice(uint256 _n)
+        external
+        view
+        returns (Harvest[] memory slice)
+    {
         slice = new Harvest[](_n);
         uint256 sliceCounter = 0;
 
@@ -143,11 +170,19 @@ abstract contract ReaperBaseStrategy is AccessControlEnumerable, Pausable {
      * Note: will never hit the first log since that won't really have a proper
      * timeSinceLastHarvest
      */
-    function averageAPRSince(uint256 _timestamp) external view returns (uint256) {
-        uint256 runningAPRSum;
-        uint256 numLogsProcessed;
+    function averageAPRSince(uint256 _timestamp)
+        external
+        view
+        returns (int256)
+    {
+        int256 runningAPRSum;
+        int256 numLogsProcessed;
 
-        for (uint256 i = harvestLog.length - 1; i > 0 && harvestLog[i].timestamp >= _timestamp; i--) {
+        for (
+            uint256 i = harvestLog.length - 1;
+            i > 0 && harvestLog[i].timestamp >= _timestamp;
+            i--
+        ) {
             runningAPRSum += _getAPRForLog(harvestLog[i]);
             numLogsProcessed++;
         }
@@ -163,11 +198,19 @@ abstract contract ReaperBaseStrategy is AccessControlEnumerable, Pausable {
      * Note: will never hit the first log since that won't really have a proper
      * timeSinceLastHarvest
      */
-    function averageAPRAcrossLastNHarvests(uint256 _n) external view returns (uint256) {
-        uint256 runningAPRSum;
-        uint256 numLogsProcessed;
+    function averageAPRAcrossLastNHarvests(int256 _n)
+        external
+        view
+        returns (int256)
+    {
+        int256 runningAPRSum;
+        int256 numLogsProcessed;
 
-        for (uint256 i = harvestLog.length - 1; i > 0 && numLogsProcessed < _n; i--) {
+        for (
+            uint256 i = harvestLog.length - 1;
+            i > 0 && numLogsProcessed < _n;
+            i--
+        ) {
             runningAPRSum += _getAPRForLog(harvestLog[i]);
             numLogsProcessed++;
         }
@@ -186,11 +229,14 @@ abstract contract ReaperBaseStrategy is AccessControlEnumerable, Pausable {
     /**
      * @dev updates the total fee, capped at 5%; only owner.
      */
-    function updateTotalFee(uint256 _totalFee) external onlyRole(DEFAULT_ADMIN_ROLE) returns (bool) {
-        require(_totalFee <= MAX_FEE, 'Fee Too High');
+    function updateTotalFee(uint256 _totalFee)
+        external
+        override
+        onlyRole(DEFAULT_ADMIN_ROLE)
+    {
+        require(_totalFee <= MAX_FEE, "Fee Too High");
         totalFee = _totalFee;
         emit TotalFeeUpdated(totalFee);
-        return true;
     }
 
     /**
@@ -207,8 +253,14 @@ abstract contract ReaperBaseStrategy is AccessControlEnumerable, Pausable {
         uint256 _treasuryFee,
         uint256 _strategistFee
     ) external onlyRole(DEFAULT_ADMIN_ROLE) returns (bool) {
-        require(_callFee + _treasuryFee == PERCENT_DIVISOR, 'sum != PERCENT_DIVISOR');
-        require(_strategistFee <= STRATEGIST_MAX_FEE, 'strategist fee > STRATEGIST_MAX_FEE');
+        require(
+            _callFee + _treasuryFee == PERCENT_DIVISOR,
+            "sum != PERCENT_DIVISOR"
+        );
+        require(
+            _strategistFee <= STRATEGIST_MAX_FEE,
+            "strategist fee > STRATEGIST_MAX_FEE"
+        );
 
         callFee = _callFee;
         treasuryFee = _treasuryFee;
@@ -217,10 +269,22 @@ abstract contract ReaperBaseStrategy is AccessControlEnumerable, Pausable {
         return true;
     }
 
+    function updateSecurityFee(uint256 _securityFee)
+        external
+        onlyRole(DEFAULT_ADMIN_ROLE)
+    {
+        require(_securityFee <= MAX_SECURITY_FEE, "fee to high!");
+        securityFee = _securityFee;
+    }
+
     /**
      * @dev only owner can update treasury address.
      */
-    function updateTreasury(address newTreasury) external onlyRole(DEFAULT_ADMIN_ROLE) returns (bool) {
+    function updateTreasury(address newTreasury)
+        external
+        onlyRole(DEFAULT_ADMIN_ROLE)
+        returns (bool)
+    {
         treasury = newTreasury;
         return true;
     }
@@ -238,7 +302,7 @@ abstract contract ReaperBaseStrategy is AccessControlEnumerable, Pausable {
             _checkRole(STRATEGIST_MULTISIG, msg.sender);
         }
 
-        require(_newStrategistRemitter != address(0), '!0');
+        require(_newStrategistRemitter != address(0), "!0");
         strategistRemitter = _newStrategistRemitter;
         emit StrategistRemitterUpdated(_newStrategistRemitter);
     }
@@ -247,21 +311,44 @@ abstract contract ReaperBaseStrategy is AccessControlEnumerable, Pausable {
      * @dev Only allow access to strategist or owner
      */
     function _onlyStrategistOrOwner() internal view {
-        require(hasRole(STRATEGIST, msg.sender) || hasRole(DEFAULT_ADMIN_ROLE, msg.sender), 'Not authorized');
+        require(
+            hasRole(STRATEGIST, msg.sender) ||
+                hasRole(DEFAULT_ADMIN_ROLE, msg.sender),
+            "Not authorized"
+        );
     }
 
-    function _getAPRForLog(Harvest storage log) internal view returns (uint256) {
-        uint256 projectedYearlyProfit = (log.profit * ONE_YEAR) / log.timeSinceLastHarvest;
-        return (projectedYearlyProfit * PERCENT_DIVISOR) / log.tvl;
+    function _getAPRForLog(Harvest storage log) internal view returns (int256) {
+        uint256 unsignedProfit;
+        if (log.profit < 0) {
+            unsignedProfit = uint256(-log.profit);
+        } else {
+            unsignedProfit = uint256(log.profit);
+        }
+
+        uint256 projectedYearlyUnsignedProfit = (unsignedProfit * ONE_YEAR) /
+            log.timeSinceLastHarvest;
+        uint256 unsignedAPR = (projectedYearlyUnsignedProfit *
+            PERCENT_DIVISOR) / log.tvl;
+
+        if (log.profit < 0) {
+            return -int256(unsignedAPR);
+        }
+
+        return int256(unsignedAPR);
     }
 
     /**
      * @dev Returns the approx amount of profit from harvesting plus fee that
      *      would be returned to harvest caller.
      */
-    function estimateHarvest() external view virtual returns (uint256 profit, uint256 callFeeToUser);
+    function estimateHarvest()
+        external
+        view
+        virtual
+        returns (uint256 profit, uint256 callFeeToUser);
 
-    function balanceOf() public virtual returns (uint256);
+    function balanceOf() public view virtual override returns (uint256);
 
     /**
      * @dev subclasses should add their custom harvesting logic in this function
