@@ -100,7 +100,7 @@ describe("Vaults", () => {
             wantAddress,
             "A Late Quartet Beethoven-Liquid Crypt",
             "rfLQUARTET",
-            432000,
+            0,
             0,
             ethers.constants.MaxUint256
         );
@@ -113,13 +113,7 @@ describe("Vaults", () => {
             [strategistAddress],
             wantAddress,
             poolId,
-            [2500,2500,2500,2500],
-            [
-                [wftmAddress, usdcAddress],
-                [wftmAddress],
-                [wftmAddress, wbtcAddress],
-                [wftmAddress, wethAddress]
-            ]
+            [2500,2500,2500,2500]
         );
         await strategy.deployed();
         await vault.initialize(strategy.address);
@@ -132,7 +126,7 @@ describe("Vaults", () => {
             .approve(vault.address, ethers.constants.MaxUint256);
     });
 
-    xdescribe("Deploying the vault and strategy", () => {
+    describe("Deploying the vault and strategy", () => {
         it("should initiate a vault with a 0 balance", async () => {
             const totalBalance = await vault.balance();
             const availableBalance = await vault.available();
@@ -145,7 +139,7 @@ describe("Vaults", () => {
     });
 
     describe("Vault Tests", () => {
-        xit("should allow deposits and account for them correctly", async () => {
+        it("should allow deposits and account for them correctly", async () => {
             const userBalance = await want.balanceOf(selfAddress);
             const initialVaultBalance = await vault.balance();
             const depositAmount = userBalance.div(2);
@@ -163,7 +157,7 @@ describe("Vaults", () => {
             expect(deductedAmount).to.equal(depositAmount);
         });
 
-        xit("should allow withdrawals", async () => {
+        it("should allow withdrawals", async () => {
             const userBalance = await want.balanceOf(selfAddress);
             const depositAmount = userBalance.div(2);
             await vault.connect(self).deposit(depositAmount);
@@ -224,12 +218,44 @@ describe("Vaults", () => {
             );
         });
 
-        xit("should allow updating the strategy", async () => {});
+        it("should allow updating the strategy", async () => {
+            const newStrategy = await Strategy.deploy(
+                vault.address,
+                [treasury.address, paymentRouterAddress],
+                [strategistAddress],
+                wantAddress,
+                poolId,
+                [2500,2500,2500,2500]
+            );
+
+            await vault.proposeStrat(newStrategy.address);
+            await vault.upgradeStrat();
+
+            const newVaultStrategyAddress = await vault.strategy();
+            console.log(`newStrategy.address ${newStrategy.address} == newVaultStrategyAddress ${newVaultStrategyAddress}`);
+            expect(newStrategy.address).to.be.equal(newVaultStrategyAddress);
+            
+        });
     });
 
     describe("Strategy Tests", () => {
-        xit("should allow pausing and then unpausing", async () => {});
+        it("should be able to pause and then unpause", async () => {
+            const userBalance = await want.balanceOf(selfAddress);
+            const depositAmount = userBalance.div(4);
+            await strategy.pause();
+            await expect(vault.connect(self).deposit(depositAmount)).to.be.reverted;
+            await strategy.unpause();
+            await expect(vault.connect(self).deposit(depositAmount)).to.not.be.reverted;
+        });
 
-        xit("should allow panic", async () => {});
+        it("should be able to panic", async () => {
+            const userBalance = await want.balanceOf(selfAddress);
+            const depositAmount = userBalance.div(4);
+            await vault.connect(self).deposit(depositAmount);
+            await expect(strategy.panic()).to.not.be.reverted;
+            const vaultBalance = await vault.balance();
+            const strategyBalance = await strategy.balanceOf();
+            expect(vaultBalance).to.equal(strategyBalance);
+        });
     });
 });

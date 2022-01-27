@@ -2,13 +2,13 @@
 
 pragma solidity ^0.8.0;
 
-import "./interfaces/IPaymentSplitter.sol";
-import "@openzeppelin/contracts/access/AccessControlEnumerable.sol";
-import "@openzeppelin/contracts/finance/PaymentSplitter.sol";
-import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import './interfaces/IPaymentSplitter.sol';
+import '@openzeppelin/contracts/access/AccessControlEnumerable.sol';
+import '@openzeppelin/contracts/finance/PaymentSplitter.sol';
+import '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
 
 contract PaymentRouter is AccessControlEnumerable {
-    bytes32 public constant STRATEGIST = keccak256("STRATEGIST");
+    bytes32 public constant STRATEGIST = keccak256('STRATEGIST');
 
     mapping(address => address) public splitterForStrategy;
     mapping(address => address[]) public splittersForStrategist;
@@ -35,9 +35,7 @@ contract PaymentRouter is AccessControlEnumerable {
     ) external {
         _onlyStrategistOrOwner();
 
-        address splitterAddr = address(
-            new PaymentSplitter(_strategists, _shares)
-        );
+        address splitterAddr = address(new PaymentSplitter(_strategists, _shares));
         splitterForStrategy[_strategy] = splitterAddr;
 
         for (uint256 i; i < _strategists.length; i++) {
@@ -55,10 +53,10 @@ contract PaymentRouter is AccessControlEnumerable {
      *      that is registered with this router.
      */
     function routePayment(IERC20 _token, uint256 _amount) external {
-        require(_amount != 0, "!0");
+        require(_amount != 0, '!0');
 
         address splitterAddr = splitterForStrategy[msg.sender];
-        require(splitterAddr != address(0), "!registered");
+        require(splitterAddr != address(0), '!registered');
 
         SafeERC20.safeTransferFrom(_token, msg.sender, splitterAddr, _amount);
     }
@@ -74,17 +72,11 @@ contract PaymentRouter is AccessControlEnumerable {
         address[] storage splitters = splittersForStrategist[msg.sender];
         for (uint256 i; i < splitters.length; i++) {
             // don't revert whole tx if individual splitter owes nothing
-            try
-                IPaymentSplitter(splitters[i]).release(_token, msg.sender)
-            {} catch {}
+            try IPaymentSplitter(splitters[i]).release(_token, msg.sender) {} catch {}
         }
     }
 
     function _onlyStrategistOrOwner() internal view {
-        require(
-            hasRole(STRATEGIST, msg.sender) ||
-                hasRole(DEFAULT_ADMIN_ROLE, msg.sender),
-            "Not authorized"
-        );
+        require(hasRole(STRATEGIST, msg.sender) || hasRole(DEFAULT_ADMIN_ROLE, msg.sender), 'Not authorized');
     }
 }

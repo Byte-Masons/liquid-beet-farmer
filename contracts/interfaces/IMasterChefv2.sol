@@ -3,7 +3,6 @@
 pragma solidity 0.8.9;
 
 interface IMasterChefv2 {
-
     function userInfo(uint256 _pid, address _user) external view returns (uint256, uint256);
 
     function poolLength() external view returns (uint256);
@@ -22,14 +21,25 @@ interface IMasterChefv2 {
 
     function emergencyWithdraw(uint256 _pid, address _to) external;
 
-    function withdrawAndHarvest(uint256 _pid, uint256 _amount, address _to) external;
+    function withdrawAndHarvest(
+        uint256 _pid,
+        uint256 _amount,
+        address _to
+    ) external;
 
     function harvest(uint256 pid, address to) external;
 
     function harvestFromMasterChef() external;
 
-    function withdraw(uint256 pid, uint256 amount, address to) external;
+    function withdraw(
+        uint256 pid,
+        uint256 amount,
+        address to
+    ) external;
 
-    function deposit(uint256 pid, uint256 amount, address to) external;
-
+    function deposit(
+        uint256 pid,
+        uint256 amount,
+        address to
+    ) external;
 }

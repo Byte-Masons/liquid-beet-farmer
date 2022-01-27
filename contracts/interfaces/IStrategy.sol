@@ -29,10 +29,4 @@ interface IStrategy {
 
     //updates Total Fee
     function updateTotalFee(uint256 _totalFee) external;
-
-    //update Call Fee
-    function updateCallFee(uint256 _callFee) external;
-
-    //updates Treasury Fee
-    function updateTreasuryFee(uint256 _treasuryFee) external;
 }

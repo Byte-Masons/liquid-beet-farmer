@@ -64,7 +64,6 @@ contract ReaperAutoCompound_LiquidV2_Beethoven is ReaperBaseStrategy {
      * @param _bpToken Token staked in the farm
      * @param _poolId Masterchef pool id => Liquid Masterchef
      * @param _ratios weight of each underlying token
-     * @param _routes swap routes to go from wftm to each underlying token
      */
     constructor(
         address _vault,
@@ -72,11 +71,8 @@ contract ReaperAutoCompound_LiquidV2_Beethoven is ReaperBaseStrategy {
         address[] memory _strategists,
         address _bpToken,
         uint256 _poolId,
-        uint256[] memory _ratios,
-        address[][] memory _routes
+        uint256[] memory _ratios
     ) ReaperBaseStrategy(_vault, _feeRemitters, _strategists) {
-        require(_ratios.length == _routes.length, CONSTRUCTOR_ERROR);
-
         bpToken = _bpToken;
         poolId = _poolId;
         poolID_bytes = IBasePool(_bpToken).getPoolId();
@@ -91,7 +87,7 @@ contract ReaperAutoCompound_LiquidV2_Beethoven is ReaperBaseStrategy {
             if (bptUnderlyingTokens[i] == WFTM) {
                 wftmToUnderlyingRoute[WFTM] = [WFTM];
             } else {
-                wftmToUnderlyingRoute[bptUnderlyingTokens[i]] = _routes[i];
+                wftmToUnderlyingRoute[bptUnderlyingTokens[i]] = [WFTM, bptUnderlyingTokens[i]];
             }
             underlyingToWeight[bptUnderlyingTokens[i]] = _ratios[i];
         }
@@ -156,7 +152,7 @@ contract ReaperAutoCompound_LiquidV2_Beethoven is ReaperBaseStrategy {
      */
     function estimateHarvest() external view virtual override returns (uint256 profit, uint256 callFeeAmount) {
         uint256 wftmFromProfit = IUniswapV2Router(SPIRIT_ROUTER).getAmountsOut(
-            IMasterChefv2(MASTER_CHEF).pendingLqdr(poolId, address(this));,
+            IMasterChefv2(MASTER_CHEF).pendingLqdr(poolId, address(this)),
             rewardTokenToWftmRoute
         )[1];
         profit = (wftmFromProfit * totalFee) / PERCENT_DIVISOR;
@@ -254,8 +250,18 @@ contract ReaperAutoCompound_LiquidV2_Beethoven is ReaperBaseStrategy {
         request.userData = userData;
         request.fromInternalBalance = false;
 
-        // Send request to the vault
+        // Send request to the balancer vault
         IVault(BEET_VAULT).joinPool(poolID_bytes, address(this), address(this), request);
+    }
+
+    /**
+     * @dev Set new route to swap from wftm to a token
+     * Does not check that token is an underlying
+     */
+    function setWftmToUnderlyingSwapRoute(address _token, address[] memory _route) external {
+        _onlyStrategistOrOwner();
+        require(_route[0] == WFTM && _route[_route.length - 1] == _token);
+        wftmToUnderlyingRoute[_token] = _route;
     }
 
     /**
@@ -280,12 +286,7 @@ contract ReaperAutoCompound_LiquidV2_Beethoven is ReaperBaseStrategy {
 
         IMasterChefv2(MASTER_CHEF).withdrawAndHarvest(poolId, balanceOfPool(), address(this));
 
-        // should we convert rewardToken to bpToken?
-        // 
-        // retireStrat is called as part of vault.upgradeStrat(), which would
-        // only transfer bpTokens to the new strat and the reward tokens would
-        // be stuck in the vault.
-        uint256 rewardTokenBal = IERC20(REWARD_TOKEN).balanceOf(address(this));    
+        uint256 rewardTokenBal = IERC20(REWARD_TOKEN).balanceOf(address(this));
         uint256 bpTokenBal = IERC20(bpToken).balanceOf(address(this));
         IERC20(REWARD_TOKEN).transfer(vault, rewardTokenBal);
         IERC20(bpToken).transfer(vault, bpTokenBal);
@@ -339,13 +340,10 @@ contract ReaperAutoCompound_LiquidV2_Beethoven is ReaperBaseStrategy {
             type(uint256).max - IERC20(WFTM).allowance(address(this), SPOOKY_ROUTER)
         );
         for (uint256 i; i < totalUnderlyingTokens; i++) {
-            
-                IERC20(bptUnderlyingTokens[i])
-                .safeIncreaseAllowance(
-                    BEET_VAULT,
-                    type(uint256).max - IERC20(bptUnderlyingTokens[i]).allowance(address(this), BEET_VAULT)
-                );
-            
+            IERC20(bptUnderlyingTokens[i]).safeIncreaseAllowance(
+                BEET_VAULT,
+                type(uint256).max - IERC20(bptUnderlyingTokens[i]).allowance(address(this), BEET_VAULT)
+            );
         }
     }
 
@@ -353,26 +351,17 @@ contract ReaperAutoCompound_LiquidV2_Beethoven is ReaperBaseStrategy {
      * @dev Set all allowances to 0
      */
     function _removeAllowances() internal {
-        IERC20(bpToken).safeDecreaseAllowance(
-            MASTER_CHEF,
-            IERC20(bpToken).allowance(address(this), MASTER_CHEF)
-        );
+        IERC20(bpToken).safeDecreaseAllowance(MASTER_CHEF, IERC20(bpToken).allowance(address(this), MASTER_CHEF));
         IERC20(REWARD_TOKEN).safeDecreaseAllowance(
             SPIRIT_ROUTER,
             IERC20(REWARD_TOKEN).allowance(address(this), SPIRIT_ROUTER)
         );
-        IERC20(WFTM).safeDecreaseAllowance(
-            SPOOKY_ROUTER,
-            IERC20(WFTM).allowance(address(this),SPOOKY_ROUTER)
-        );
+        IERC20(WFTM).safeDecreaseAllowance(SPOOKY_ROUTER, IERC20(WFTM).allowance(address(this), SPOOKY_ROUTER));
         for (uint256 i; i < totalUnderlyingTokens; i++) {
-            
-                IERC20(bptUnderlyingTokens[i])
-                .safeDecreaseAllowance(
-                    BEET_VAULT,
-                    IERC20(bptUnderlyingTokens[i]).allowance(address(this), BEET_VAULT)
-                );
-            
+            IERC20(bptUnderlyingTokens[i]).safeDecreaseAllowance(
+                BEET_VAULT,
+                IERC20(bptUnderlyingTokens[i]).allowance(address(this), BEET_VAULT)
+            );
         }
     }
 }
