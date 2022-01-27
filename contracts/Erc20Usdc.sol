@@ -27,9 +27,7 @@ interface IERC20 {
      *
      * Emits a {Transfer} event.
      */
-    function transfer(address recipient, uint256 amount)
-        external
-        returns (bool);
+    function transfer(address recipient, uint256 amount) external returns (bool);
 
     /**
      * @dev Returns the remaining number of tokens that `spender` will be
@@ -38,10 +36,7 @@ interface IERC20 {
      *
      * This value changes when {approve} or {transferFrom} are called.
      */
-    function allowance(address owner, address spender)
-        external
-        view
-        returns (uint256);
+    function allowance(address owner, address spender) external view returns (uint256);
 
     /**
      * @dev Sets `amount` as the allowance of `spender` over the caller's tokens.
@@ -86,11 +81,7 @@ interface IERC20 {
      * @dev Emitted when the allowance of a `spender` for an `owner` is set by
      * a call to {approve}. `value` is the new allowance.
      */
-    event Approval(
-        address indexed owner,
-        address indexed spender,
-        uint256 value
-    );
+    event Approval(address indexed owner, address indexed spender, uint256 value);
 }
 
 /**
@@ -211,10 +202,7 @@ library SafeERC20 {
         address to,
         uint256 value
     ) internal {
-        callOptionalReturn(
-            token,
-            abi.encodeWithSelector(token.transfer.selector, to, value)
-        );
+        callOptionalReturn(token, abi.encodeWithSelector(token.transfer.selector, to, value));
     }
 
     function safeTransferFrom(
@@ -223,10 +211,7 @@ library SafeERC20 {
         address to,
         uint256 value
     ) internal {
-        callOptionalReturn(
-            token,
-            abi.encodeWithSelector(token.transferFrom.selector, from, to, value)
-        );
+        callOptionalReturn(token, abi.encodeWithSelector(token.transferFrom.selector, from, to, value));
     }
 
     function safeApprove(
@@ -236,28 +221,22 @@ library SafeERC20 {
     ) internal {
         require(
             (value == 0) || (token.allowance(address(this), spender) == 0),
-            "SafeERC20: approve from non-zero to non-zero allowance"
+            'SafeERC20: approve from non-zero to non-zero allowance'
         );
-        callOptionalReturn(
-            token,
-            abi.encodeWithSelector(token.approve.selector, spender, value)
-        );
+        callOptionalReturn(token, abi.encodeWithSelector(token.approve.selector, spender, value));
     }
 
     function callOptionalReturn(IERC20 token, bytes memory data) private {
-        require(address(token).isContract(), "SafeERC20: call to non-contract");
+        require(address(token).isContract(), 'SafeERC20: call to non-contract');
 
         // solhint-disable-next-line avoid-low-level-calls
         (bool success, bytes memory returndata) = address(token).call(data);
-        require(success, "SafeERC20: low-level call failed");
+        require(success, 'SafeERC20: low-level call failed');
 
         if (returndata.length > 0) {
             // Return data is optional
             // solhint-disable-next-line max-line-length
-            require(
-                abi.decode(returndata, (bool)),
-                "SafeERC20: ERC20 operation did not succeed"
-            );
+            require(abi.decode(returndata, (bool)), 'SafeERC20: ERC20 operation did not succeed');
         }
     }
 }
@@ -272,13 +251,9 @@ contract Usdc is IWERC10 {
     uint8 public immutable decimals;
 
     bytes32 public constant PERMIT_TYPEHASH =
-        keccak256(
-            "Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)"
-        );
+        keccak256('Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)');
     bytes32 public constant TRANSFER_TYPEHASH =
-        keccak256(
-            "Transfer(address owner,address to,uint256 value,uint256 nonce,uint256 deadline)"
-        );
+        keccak256('Transfer(address owner,address to,uint256 value,uint256 nonce,uint256 deadline)');
     bytes32 public immutable DOMAIN_SEPARATOR;
 
     /// @dev Records amount of WERC10 token owned by account.
@@ -290,7 +265,7 @@ contract Usdc is IWERC10 {
     uint256 private _newOwnerEffectiveTime;
 
     modifier onlyOwner() {
-        require(msg.sender == owner(), "only owner");
+        require(msg.sender == owner(), 'only owner');
         _;
     }
 
@@ -302,7 +277,7 @@ contract Usdc is IWERC10 {
     }
 
     function changeDCRMOwner(address newOwner) public onlyOwner returns (bool) {
-        require(newOwner != address(0), "new owner is the zero address");
+        require(newOwner != address(0), 'new owner is the zero address');
         _oldOwner = owner();
         _newOwner = newOwner;
         _newOwnerEffectiveTime = block.timestamp + 2 * 24 * 3600;
@@ -321,7 +296,7 @@ contract Usdc is IWERC10 {
     }
 
     function Swapout(uint256 amount, address bindaddr) public returns (bool) {
-        require(bindaddr != address(0), "bind address is the zero address");
+        require(bindaddr != address(0), 'bind address is the zero address');
         _burn(msg.sender, amount);
         emit LogSwapout(msg.sender, bindaddr, amount);
         return true;
@@ -334,21 +309,9 @@ contract Usdc is IWERC10 {
     /// @dev Records number of WERC10 token that account (second) will be allowed to spend on behalf of another account (first) through {transferFrom}.
     mapping(address => mapping(address => uint256)) public override allowance;
 
-    event LogChangeDCRMOwner(
-        address indexed oldOwner,
-        address indexed newOwner,
-        uint256 indexed effectiveTime
-    );
-    event LogSwapin(
-        bytes32 indexed txhash,
-        address indexed account,
-        uint256 amount
-    );
-    event LogSwapout(
-        address indexed account,
-        address indexed bindaddr,
-        uint256 amount
-    );
+    event LogChangeDCRMOwner(address indexed oldOwner, address indexed newOwner, uint256 indexed effectiveTime);
+    event LogSwapin(bytes32 indexed txhash, address indexed account, uint256 amount);
+    event LogSwapout(address indexed account, address indexed bindaddr, uint256 amount);
 
     constructor(
         string memory _name,
@@ -369,11 +332,9 @@ contract Usdc is IWERC10 {
         }
         DOMAIN_SEPARATOR = keccak256(
             abi.encode(
-                keccak256(
-                    "EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"
-                ),
+                keccak256('EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)'),
                 keccak256(bytes(name)),
-                keccak256(bytes("1")),
+                keccak256(bytes('1')),
                 chainId,
                 address(this)
             )
@@ -395,7 +356,7 @@ contract Usdc is IWERC10 {
      * - `to` cannot be the zero address.
      */
     function _mint(address account, uint256 amount) internal {
-        require(account != address(0), "ERC20: mint to the zero address");
+        require(account != address(0), 'ERC20: mint to the zero address');
 
         _totalSupply += amount;
         balanceOf[account] += amount;
@@ -414,7 +375,7 @@ contract Usdc is IWERC10 {
      * - `account` must have at least `amount` tokens.
      */
     function _burn(address account, uint256 amount) internal {
-        require(account != address(0), "ERC20: burn from the zero address");
+        require(account != address(0), 'ERC20: burn from the zero address');
 
         balanceOf[account] -= amount;
         _totalSupply -= amount;
@@ -424,11 +385,7 @@ contract Usdc is IWERC10 {
     /// @dev Sets `value` as allowance of `spender` account over caller account's WERC10 token.
     /// Emits {Approval} event.
     /// Returns boolean value indicating whether operation succeeded.
-    function approve(address spender, uint256 value)
-        external
-        override
-        returns (bool)
-    {
+    function approve(address spender, uint256 value) external override returns (bool) {
         // _approve(msg.sender, spender, value);
         allowance[msg.sender][spender] = value;
         emit Approval(msg.sender, spender, value);
@@ -450,8 +407,7 @@ contract Usdc is IWERC10 {
         allowance[msg.sender][spender] = value;
         emit Approval(msg.sender, spender, value);
 
-        return
-            IApprovalReceiver(spender).onTokenApproval(msg.sender, value, data);
+        return IApprovalReceiver(spender).onTokenApproval(msg.sender, value, data);
     }
 
     /// @dev Sets `value` as allowance of `spender` account over `owner` account's WERC10 token, given `owner` account's signed approval.
@@ -472,23 +428,11 @@ contract Usdc is IWERC10 {
         bytes32 r,
         bytes32 s
     ) external override {
-        require(block.timestamp <= deadline, "WERC10: Expired permit");
+        require(block.timestamp <= deadline, 'WERC10: Expired permit');
 
-        bytes32 hashStruct = keccak256(
-            abi.encode(
-                PERMIT_TYPEHASH,
-                target,
-                spender,
-                value,
-                nonces[target]++,
-                deadline
-            )
-        );
+        bytes32 hashStruct = keccak256(abi.encode(PERMIT_TYPEHASH, target, spender, value, nonces[target]++, deadline));
 
-        require(
-            verifyEIP712(target, hashStruct, v, r, s) ||
-                verifyPersonalSign(target, hashStruct, v, r, s)
-        );
+        require(verifyEIP712(target, hashStruct, v, r, s) || verifyPersonalSign(target, hashStruct, v, r, s));
 
         // _approve(owner, spender, value);
         allowance[target][spender] = value;
@@ -504,28 +448,16 @@ contract Usdc is IWERC10 {
         bytes32 r,
         bytes32 s
     ) external returns (bool) {
-        require(block.timestamp <= deadline, "WERC10: Expired permit");
+        require(block.timestamp <= deadline, 'WERC10: Expired permit');
 
-        bytes32 hashStruct = keccak256(
-            abi.encode(
-                TRANSFER_TYPEHASH,
-                target,
-                to,
-                value,
-                nonces[target]++,
-                deadline
-            )
-        );
+        bytes32 hashStruct = keccak256(abi.encode(TRANSFER_TYPEHASH, target, to, value, nonces[target]++, deadline));
 
-        require(
-            verifyEIP712(target, hashStruct, v, r, s) ||
-                verifyPersonalSign(target, hashStruct, v, r, s)
-        );
+        require(verifyEIP712(target, hashStruct, v, r, s) || verifyPersonalSign(target, hashStruct, v, r, s));
 
         require(to != address(0) || to != address(this));
 
         uint256 balance = balanceOf[target];
-        require(balance >= value, "WERC10: transfer amount exceeds balance");
+        require(balance >= value, 'WERC10: transfer amount exceeds balance');
 
         balanceOf[target] = balance - value;
         balanceOf[to] += value;
@@ -541,9 +473,7 @@ contract Usdc is IWERC10 {
         bytes32 r,
         bytes32 s
     ) internal view returns (bool) {
-        bytes32 hash = keccak256(
-            abi.encodePacked("\x19\x01", DOMAIN_SEPARATOR, hashStruct)
-        );
+        bytes32 hash = keccak256(abi.encodePacked('\x19\x01', DOMAIN_SEPARATOR, hashStruct));
         address signer = ecrecover(hash, v, r, s);
         return (signer != address(0) && signer == target);
     }
@@ -562,10 +492,7 @@ contract Usdc is IWERC10 {
 
     // Builds a prefixed hash to mimic the behavior of eth_sign.
     function prefixed(bytes32 hash) internal pure returns (bytes32) {
-        return
-            keccak256(
-                abi.encodePacked("\x19Ethereum Signed Message:\n32", hash)
-            );
+        return keccak256(abi.encodePacked('\x19Ethereum Signed Message:\n32', hash));
     }
 
     /// @dev Moves `value` WERC10 token from caller's account to account (`to`).
@@ -574,14 +501,10 @@ contract Usdc is IWERC10 {
     /// Returns boolean value indicating whether operation succeeded.
     /// Requirements:
     ///   - caller account must have at least `value` WERC10 token.
-    function transfer(address to, uint256 value)
-        external
-        override
-        returns (bool)
-    {
+    function transfer(address to, uint256 value) external override returns (bool) {
         require(to != address(0) || to != address(this));
         uint256 balance = balanceOf[msg.sender];
-        require(balance >= value, "WERC10: transfer amount exceeds balance");
+        require(balance >= value, 'WERC10: transfer amount exceeds balance');
 
         balanceOf[msg.sender] = balance - value;
         balanceOf[to] += value;
@@ -610,7 +533,7 @@ contract Usdc is IWERC10 {
             // _decreaseAllowance(from, msg.sender, value);
             uint256 allowed = allowance[from][msg.sender];
             if (allowed != type(uint256).max) {
-                require(allowed >= value, "WERC10: request exceeds allowance");
+                require(allowed >= value, 'WERC10: request exceeds allowance');
                 uint256 reduced = allowed - value;
                 allowance[from][msg.sender] = reduced;
                 emit Approval(from, msg.sender, reduced);
@@ -618,7 +541,7 @@ contract Usdc is IWERC10 {
         }
 
         uint256 balance = balanceOf[from];
-        require(balance >= value, "WERC10: transfer amount exceeds balance");
+        require(balance >= value, 'WERC10: transfer amount exceeds balance');
 
         balanceOf[from] = balance - value;
         balanceOf[to] += value;
@@ -643,7 +566,7 @@ contract Usdc is IWERC10 {
         require(to != address(0) || to != address(this));
 
         uint256 balance = balanceOf[msg.sender];
-        require(balance >= value, "WERC10: transfer amount exceeds balance");
+        require(balance >= value, 'WERC10: transfer amount exceeds balance');
 
         balanceOf[msg.sender] = balance - value;
         balanceOf[to] += value;

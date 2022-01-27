@@ -2,16 +2,12 @@
 
 pragma solidity ^0.8.0;
 
-import "./interfaces/IStrategy.sol";
-import "@openzeppelin/contracts/access/AccessControlEnumerable.sol";
-import "@openzeppelin/contracts/security/Pausable.sol";
-import "@openzeppelin/contracts/utils/Address.sol";
+import './interfaces/IStrategy.sol';
+import '@openzeppelin/contracts/access/AccessControlEnumerable.sol';
+import '@openzeppelin/contracts/security/Pausable.sol';
+import '@openzeppelin/contracts/utils/Address.sol';
 
-abstract contract ReaperBaseStrategy is
-    AccessControlEnumerable,
-    Pausable,
-    IStrategy
-{
+abstract contract ReaperBaseStrategy is AccessControlEnumerable, Pausable, IStrategy {
     uint256 public constant PERCENT_DIVISOR = 10_000;
     uint256 public constant ONE_YEAR = 365 days;
 
@@ -29,9 +25,8 @@ abstract contract ReaperBaseStrategy is
     /**
      * Reaper Roles
      */
-    bytes32 public constant STRATEGIST = keccak256("STRATEGIST");
-    bytes32 public constant STRATEGIST_MULTISIG =
-        keccak256("STRATEGIST_MULTISIG");
+    bytes32 public constant STRATEGIST = keccak256('STRATEGIST');
+    bytes32 public constant STRATEGIST_MULTISIG = keccak256('STRATEGIST_MULTISIG');
 
     /**
      * @dev Reaper contracts:
@@ -81,11 +76,7 @@ abstract contract ReaperBaseStrategy is
      * {StrategistRemitterUpdated} Event that is fired each time the strategistRemitter address is updated.
      */
     event TotalFeeUpdated(uint256 newFee);
-    event FeesUpdated(
-        uint256 newCallFee,
-        uint256 newTreasuryFee,
-        uint256 newStrategistFee
-    );
+    event FeesUpdated(uint256 newCallFee, uint256 newTreasuryFee, uint256 newStrategistFee);
     event StratHarvest(address indexed harvester);
     event StrategistRemitterUpdated(address newStrategistRemitter);
 
@@ -115,9 +106,7 @@ abstract contract ReaperBaseStrategy is
         _harvestCore();
 
         if (
-            harvestLog.length == 0 ||
-            block.timestamp >=
-            harvestLog[harvestLog.length - 1].timestamp + harvestLogCadence
+            harvestLog.length == 0 || block.timestamp >= harvestLog[harvestLog.length - 1].timestamp + harvestLogCadence
         ) {
             uint256 endingTvl = balanceOf();
             int256 profit;
@@ -149,11 +138,7 @@ abstract contract ReaperBaseStrategy is
     /**
      * @dev Returns a slice of the harvest log containing the _n latest harvests.
      */
-    function latestHarvestLogSlice(uint256 _n)
-        external
-        view
-        returns (Harvest[] memory slice)
-    {
+    function latestHarvestLogSlice(uint256 _n) external view returns (Harvest[] memory slice) {
         slice = new Harvest[](_n);
         uint256 sliceCounter = 0;
 
@@ -170,19 +155,11 @@ abstract contract ReaperBaseStrategy is
      * Note: will never hit the first log since that won't really have a proper
      * timeSinceLastHarvest
      */
-    function averageAPRSince(uint256 _timestamp)
-        external
-        view
-        returns (int256)
-    {
+    function averageAPRSince(uint256 _timestamp) external view returns (int256) {
         int256 runningAPRSum;
         int256 numLogsProcessed;
 
-        for (
-            uint256 i = harvestLog.length - 1;
-            i > 0 && harvestLog[i].timestamp >= _timestamp;
-            i--
-        ) {
+        for (uint256 i = harvestLog.length - 1; i > 0 && harvestLog[i].timestamp >= _timestamp; i--) {
             runningAPRSum += _getAPRForLog(harvestLog[i]);
             numLogsProcessed++;
         }
@@ -198,19 +175,11 @@ abstract contract ReaperBaseStrategy is
      * Note: will never hit the first log since that won't really have a proper
      * timeSinceLastHarvest
      */
-    function averageAPRAcrossLastNHarvests(int256 _n)
-        external
-        view
-        returns (int256)
-    {
+    function averageAPRAcrossLastNHarvests(int256 _n) external view returns (int256) {
         int256 runningAPRSum;
         int256 numLogsProcessed;
 
-        for (
-            uint256 i = harvestLog.length - 1;
-            i > 0 && numLogsProcessed < _n;
-            i--
-        ) {
+        for (uint256 i = harvestLog.length - 1; i > 0 && numLogsProcessed < _n; i--) {
             runningAPRSum += _getAPRForLog(harvestLog[i]);
             numLogsProcessed++;
         }
@@ -229,12 +198,8 @@ abstract contract ReaperBaseStrategy is
     /**
      * @dev updates the total fee, capped at 5%; only owner.
      */
-    function updateTotalFee(uint256 _totalFee)
-        external
-        override
-        onlyRole(DEFAULT_ADMIN_ROLE)
-    {
-        require(_totalFee <= MAX_FEE, "Fee Too High");
+    function updateTotalFee(uint256 _totalFee) external override onlyRole(DEFAULT_ADMIN_ROLE) {
+        require(_totalFee <= MAX_FEE, 'Fee Too High');
         totalFee = _totalFee;
         emit TotalFeeUpdated(totalFee);
     }
@@ -253,14 +218,8 @@ abstract contract ReaperBaseStrategy is
         uint256 _treasuryFee,
         uint256 _strategistFee
     ) external onlyRole(DEFAULT_ADMIN_ROLE) returns (bool) {
-        require(
-            _callFee + _treasuryFee == PERCENT_DIVISOR,
-            "sum != PERCENT_DIVISOR"
-        );
-        require(
-            _strategistFee <= STRATEGIST_MAX_FEE,
-            "strategist fee > STRATEGIST_MAX_FEE"
-        );
+        require(_callFee + _treasuryFee == PERCENT_DIVISOR, 'sum != PERCENT_DIVISOR');
+        require(_strategistFee <= STRATEGIST_MAX_FEE, 'strategist fee > STRATEGIST_MAX_FEE');
 
         callFee = _callFee;
         treasuryFee = _treasuryFee;
@@ -269,22 +228,15 @@ abstract contract ReaperBaseStrategy is
         return true;
     }
 
-    function updateSecurityFee(uint256 _securityFee)
-        external
-        onlyRole(DEFAULT_ADMIN_ROLE)
-    {
-        require(_securityFee <= MAX_SECURITY_FEE, "fee to high!");
+    function updateSecurityFee(uint256 _securityFee) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        require(_securityFee <= MAX_SECURITY_FEE, 'fee to high!');
         securityFee = _securityFee;
     }
 
     /**
      * @dev only owner can update treasury address.
      */
-    function updateTreasury(address newTreasury)
-        external
-        onlyRole(DEFAULT_ADMIN_ROLE)
-        returns (bool)
-    {
+    function updateTreasury(address newTreasury) external onlyRole(DEFAULT_ADMIN_ROLE) returns (bool) {
         treasury = newTreasury;
         return true;
     }
@@ -302,7 +254,7 @@ abstract contract ReaperBaseStrategy is
             _checkRole(STRATEGIST_MULTISIG, msg.sender);
         }
 
-        require(_newStrategistRemitter != address(0), "!0");
+        require(_newStrategistRemitter != address(0), '!0');
         strategistRemitter = _newStrategistRemitter;
         emit StrategistRemitterUpdated(_newStrategistRemitter);
     }
@@ -311,11 +263,7 @@ abstract contract ReaperBaseStrategy is
      * @dev Only allow access to strategist or owner
      */
     function _onlyStrategistOrOwner() internal view {
-        require(
-            hasRole(STRATEGIST, msg.sender) ||
-                hasRole(DEFAULT_ADMIN_ROLE, msg.sender),
-            "Not authorized"
-        );
+        require(hasRole(STRATEGIST, msg.sender) || hasRole(DEFAULT_ADMIN_ROLE, msg.sender), 'Not authorized');
     }
 
     function _getAPRForLog(Harvest storage log) internal view returns (int256) {
@@ -326,10 +274,8 @@ abstract contract ReaperBaseStrategy is
             unsignedProfit = uint256(log.profit);
         }
 
-        uint256 projectedYearlyUnsignedProfit = (unsignedProfit * ONE_YEAR) /
-            log.timeSinceLastHarvest;
-        uint256 unsignedAPR = (projectedYearlyUnsignedProfit *
-            PERCENT_DIVISOR) / log.tvl;
+        uint256 projectedYearlyUnsignedProfit = (unsignedProfit * ONE_YEAR) / log.timeSinceLastHarvest;
+        uint256 unsignedAPR = (projectedYearlyUnsignedProfit * PERCENT_DIVISOR) / log.tvl;
 
         if (log.profit < 0) {
             return -int256(unsignedAPR);
@@ -342,11 +288,7 @@ abstract contract ReaperBaseStrategy is
      * @dev Returns the approx amount of profit from harvesting plus fee that
      *      would be returned to harvest caller.
      */
-    function estimateHarvest()
-        external
-        view
-        virtual
-        returns (uint256 profit, uint256 callFeeToUser);
+    function estimateHarvest() external view virtual returns (uint256 profit, uint256 callFeeToUser);
 
     function balanceOf() public view virtual override returns (uint256);
 
