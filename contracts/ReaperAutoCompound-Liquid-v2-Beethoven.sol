@@ -32,9 +32,6 @@ contract ReaperAutoCompound_LiquidV2_Beethoven is ReaperBaseStrategy {
 
     uint256 public totalUnderlyingTokens;
 
-    mapping(uint256 => bool) public isEmitting;
-    bool public harvestOn = false;
-
     /**
      * @dev Third Party Contracts:
      * {MASTER_CHEF} - masterChef for pools. -> LQDR
@@ -52,7 +49,6 @@ contract ReaperAutoCompound_LiquidV2_Beethoven is ReaperBaseStrategy {
      * {rewardTokenToWftmRoute} - Route ID to swap from {REWARD_TOKEN} to {WFTM}.
      * {rewardTokenToStakedTokenRoute} - Routes used to go from {WFTM} to {token}.
      */
-    bytes32 public route_ID;
     address[] public rewardTokenToWftmRoute = [REWARD_TOKEN, WFTM];
     mapping(address => address[]) public wftmToUnderlyingRoute;
     mapping(address => uint256) public underlyingToWeight;
@@ -156,9 +152,8 @@ contract ReaperAutoCompound_LiquidV2_Beethoven is ReaperBaseStrategy {
      *      would be returned to harvest caller.
      */
     function estimateHarvest() external view virtual override returns (uint256 profit, uint256 callFeeAmount) {
-        IMasterChefv2(MASTER_CHEF).pendingLqdr(poolId, address(this));
         uint256 wftmFromProfit = IUniswapV2Router(SPIRIT_ROUTER).getAmountsOut(
-            IERC20(REWARD_TOKEN).balanceOf(address(this)),
+            IMasterChefv2(MASTER_CHEF).pendingLqdr(poolId, address(this));,
             rewardTokenToWftmRoute
         )[1];
         profit = (wftmFromProfit * totalFee) / PERCENT_DIVISOR;
@@ -193,8 +188,7 @@ contract ReaperAutoCompound_LiquidV2_Beethoven is ReaperBaseStrategy {
 
             IERC20(WFTM).safeTransfer(msg.sender, callFeeAmount);
             IERC20(WFTM).safeTransfer(treasury, treasuryFeeAmount);
-            IERC20(WFTM).safeIncreaseAllowance(strategistRemitter, strategistFeeAmount);
-            IPaymentRouter(strategistRemitter).routePayment(WFTM, strategistFeeAmount);
+            IERC20(WFTM).safeTransfer(strategistRemitter, strategistFeeAmount);
         }
     }
 
@@ -202,13 +196,11 @@ contract ReaperAutoCompound_LiquidV2_Beethoven is ReaperBaseStrategy {
      * @dev Request {bpToken} to the {BEET_VAULT} based on underlying tokens balances
      */
     function _addLiquidity() internal {
-        bool hasUnderlyingWftm = false;
         uint256 wftmBal = IERC20(WFTM).balanceOf(address(this));
 
         for (uint256 i; i < totalUnderlyingTokens; i++) {
             address token = bptUnderlyingTokens[i];
             if (token == WFTM) {
-                hasUnderlyingWftm = true;
                 continue;
             }
 
@@ -297,6 +289,11 @@ contract ReaperAutoCompound_LiquidV2_Beethoven is ReaperBaseStrategy {
 
         IMasterChefv2(MASTER_CHEF).withdrawAndHarvest(poolId, balanceOfPool(), address(this));
 
+        // should we convert rewardToken to bpToken?
+        // 
+        // retireStrat is called as part of vault.upgradeStrat(), which would
+        // only transfer bpTokens to the new strat and the reward tokens would
+        // be stuck in the vault.
         uint256 rewardTokenBal = IERC20(REWARD_TOKEN).balanceOf(address(this));    
         uint256 bpTokenBal = IERC20(bpToken).balanceOf(address(this));
         IERC20(REWARD_TOKEN).transfer(vault, rewardTokenBal);
@@ -309,8 +306,8 @@ contract ReaperAutoCompound_LiquidV2_Beethoven is ReaperBaseStrategy {
      */
     function panic() public {
         _onlyStrategistOrOwner();
-        pause();
         IMasterChefv2(MASTER_CHEF).emergencyWithdraw(poolId, address(this));
+        pause();
     }
 
     /**
