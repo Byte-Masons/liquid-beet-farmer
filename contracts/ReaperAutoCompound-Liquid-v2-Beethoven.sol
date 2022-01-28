@@ -52,6 +52,7 @@ contract ReaperAutoCompound_LiquidV2_Beethoven is ReaperBaseStrategy {
     address[] public rewardTokenToWftmRoute = [REWARD_TOKEN, WFTM];
     mapping(address => address[]) public wftmToUnderlyingRoute;
     mapping(address => uint256) public underlyingToWeight;
+    mapping(address => address) public underlyingToRouter;
 
     string constant CONSTRUCTOR_ERROR = 'constructor error';
     uint256 constant MINIMUM_BPT = 1; //virtually ensures we can always get the desired BPT
@@ -63,23 +64,20 @@ contract ReaperAutoCompound_LiquidV2_Beethoven is ReaperBaseStrategy {
      * @param _strategists Strategists piloting this strategy
      * @param _bpToken Token staked in the farm
      * @param _poolId Masterchef pool id => Liquid Masterchef
-     * @param _ratios weight of each underlying token
      */
     constructor(
         address _vault,
         address[] memory _feeRemitters,
         address[] memory _strategists,
         address _bpToken,
-        uint256 _poolId,
-        uint256[] memory _ratios
+        uint256 _poolId
     ) ReaperBaseStrategy(_vault, _feeRemitters, _strategists) {
         bpToken = _bpToken;
         poolId = _poolId;
         poolID_bytes = IBasePool(_bpToken).getPoolId();
+        uint256[] memory normalizedWeights = IBaseWeightedPool(_bpToken).getNormalizedWeights();
         IERC20[] memory _bpTokens;
         (_bpTokens, , ) = IVault(BEET_VAULT).getPoolTokens(poolID_bytes);
-
-        require(_bpTokens.length == _ratios.length, CONSTRUCTOR_ERROR);
 
         totalUnderlyingTokens = _bpTokens.length;
         for (uint256 i; i < totalUnderlyingTokens; i++) {
@@ -89,7 +87,8 @@ contract ReaperAutoCompound_LiquidV2_Beethoven is ReaperBaseStrategy {
             } else {
                 wftmToUnderlyingRoute[bptUnderlyingTokens[i]] = [WFTM, bptUnderlyingTokens[i]];
             }
-            underlyingToWeight[bptUnderlyingTokens[i]] = _ratios[i];
+            underlyingToWeight[bptUnderlyingTokens[i]] = (normalizedWeights[i] * PERCENT_DIVISOR) / 1e18;
+            underlyingToRouter[bptUnderlyingTokens[i]] = SPOOKY_ROUTER;
         }
 
         _giveAllowances();
@@ -262,6 +261,12 @@ contract ReaperAutoCompound_LiquidV2_Beethoven is ReaperBaseStrategy {
         _onlyStrategistOrOwner();
         require(_route[0] == WFTM && _route[_route.length - 1] == _token);
         wftmToUnderlyingRoute[_token] = _route;
+    }
+
+    function setUnderlyingToRouter(address _token, address _router) external {
+        _onlyStrategistOrOwner();
+        require(_router == SPIRIT_ROUTER || _router == SPOOKY_ROUTER, 'wrong router');
+        underlyingToRouter[_token] = _router;
     }
 
     /**
