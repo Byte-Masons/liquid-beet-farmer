@@ -19,7 +19,7 @@ const deployStrategy = async (vaultAddress) => {
 }
 
 async function main() {
-  const vaultAddress = "0x25af6Bb8b9308b3B187F4c67344031b4bBdf8d44";
+  const vaultAddress = "0xbdf94B9D813AE4B54D9B221C6fd003AF2e1B8432";
   const strategyAddress = await deployStrategy(vaultAddress);
 }
 

@@ -51,8 +51,8 @@ const initializeVault = async (vaultAddress, strategyAddress) => {
 
 async function main() {
   const vaultAddress = await deployVault();
-  const strategyAddress = await deployStrategy(vaultAddress);
-  await initializeVault(vaultAddress, strategyAddress);
+  // const strategyAddress = await deployStrategy(vaultAddress);
+  // await initializeVault(vaultAddress, strategyAddress);
 }
 
 main()
