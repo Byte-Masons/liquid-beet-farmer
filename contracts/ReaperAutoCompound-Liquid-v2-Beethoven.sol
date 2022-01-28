@@ -98,17 +98,11 @@ contract ReaperAutoCompound_LiquidV2_Beethoven is ReaperBaseStrategy {
 
     // CORE FUNCTIONS
 
-    /**
-     * @dev Function that puts the funds to work.
-     * It gets called whenever someone deposits in the strategy's vault contract.
-     */
-    function deposit() public whenNotPaused {
-        uint256 bpTokenBal = IERC20(bpToken).balanceOf(address(this));
-
-        if (bpTokenBal != 0) {
-            IMasterChefv2(MASTER_CHEF).deposit(poolId, bpTokenBal, address(this));
-        }
-    }
+    /*
+    * ----------------------------------------------------------------------------------------------------------
+    * -------------------------------------- EXTERNAL MUTATIVE -------------------------------------------------
+    * ----------------------------------------------------------------------------------------------------------
+    */
 
     /**
      * @dev Withdraws funds and sents them back to the vault.
@@ -131,6 +125,149 @@ contract ReaperAutoCompound_LiquidV2_Beethoven is ReaperBaseStrategy {
         IERC20(bpToken).safeTransfer(vault, bpTokenBal - withdrawFee);
     }
 
+    /*
+    * ----------------------------------------------------------------------------------------------------------
+    * -------------------------------------- EXTERNAL VIEW -----------------------------------------------------
+    * ----------------------------------------------------------------------------------------------------------
+    */
+
+    /**
+     * @dev Returns the approx amount of profit from harvesting plus fee that
+     *      would be returned to harvest caller.
+     */
+    function estimateHarvest() external view virtual override returns (uint256 profit, uint256 callFeeAmount) {
+        uint256 wftmFromProfit = IUniswapV2Router(SPIRIT_ROUTER).getAmountsOut(
+            IMasterChefv2(MASTER_CHEF).pendingLqdr(poolId, address(this)),
+            rewardTokenToWftmRoute
+        )[1];
+        profit = (wftmFromProfit * totalFee) / PERCENT_DIVISOR;
+        callFeeAmount = (profit * callFee) / PERCENT_DIVISOR;
+        profit -= callFeeAmount;
+    }
+
+    /*
+    * ----------------------------------------------------------------------------------------------------------
+    * -------------------------------------- EXTERNAL ADMIN ----------------------------------------------------
+    * ----------------------------------------------------------------------------------------------------------
+    */
+
+    /**
+     * @dev Set new route to swap from wftm to a token
+     * Does not check that token is an underlying
+     */
+    function setWftmToUnderlyingSwapRoute(address _token, address[] memory _route) external {
+        _onlyStrategistOrOwner();
+        require(_route[0] == WFTM && _route[_route.length - 1] == _token);
+        wftmToUnderlyingRoute[_token] = _route;
+    }
+
+    /**
+     * @dev Set new router to swap from wftm to a token
+     */
+    function setUnderlyingToRouter(address _token, address _router) external {
+        _onlyStrategistOrOwner();
+        require(_router == SPIRIT_ROUTER || _router == SPOOKY_ROUTER, 'unknown router');
+        underlyingToRouter[_token] = _router;
+    }
+
+    /**
+     * @dev Function that has to be called as part of strat migration. It sends all the available funds back to the
+     *      vault, ready to be migrated to the new strat.
+     */
+    function retireStrat() external {
+        require(msg.sender == vault, '!vault');
+
+        IMasterChefv2(MASTER_CHEF).withdrawAndHarvest(poolId, balanceOfPool(), address(this));
+
+        uint256 rewardTokenBal = IERC20(REWARD_TOKEN).balanceOf(address(this));
+        uint256 bpTokenBal = IERC20(bpToken).balanceOf(address(this));
+        IERC20(REWARD_TOKEN).transfer(vault, rewardTokenBal);
+        IERC20(bpToken).transfer(vault, bpTokenBal);
+    }
+
+    /**
+     * @dev Unpauses the strat. Can only be called by strategist or owner.
+     */
+    function unpause() external {
+        _onlyStrategistOrOwner();
+        _unpause();
+
+        _giveAllowances();
+
+        deposit();
+    }
+
+    /*
+    * ----------------------------------------------------------------------------------------------------------
+    * -------------------------------------- PUBLIC MUTATIVE ---------------------------------------------------
+    * ----------------------------------------------------------------------------------------------------------
+    */
+
+    /**
+     * @dev Function that puts the funds to work.
+     * It gets called whenever someone deposits in the strategy's vault contract.
+     */
+    function deposit() public whenNotPaused {
+        uint256 bpTokenBal = IERC20(bpToken).balanceOf(address(this));
+
+        if (bpTokenBal != 0) {
+            IMasterChefv2(MASTER_CHEF).deposit(poolId, bpTokenBal, address(this));
+        }
+    }
+
+    /*
+    * ----------------------------------------------------------------------------------------------------------
+    * -------------------------------------- PUBLIC VIEW -------------------------------------------------------
+    * ----------------------------------------------------------------------------------------------------------
+    */
+
+    /**
+     * @dev Function to calculate the total underlying {token} held by the strat.
+     * It takes into account both the funds in hand, as the funds allocated in protocols.
+     */
+    function balanceOf() public view override returns (uint256 balance) {
+        balance = IERC20(bpToken).balanceOf(address(this)) + balanceOfPool();
+    }
+
+    /**
+     * @dev Returns the amount of {token} deposited in the Master Chef to farm
+     */
+    function balanceOfPool() public view returns (uint256) {
+        (uint256 _amount, ) = IMasterChefv2(MASTER_CHEF).userInfo(poolId, address(this));
+        return _amount;
+    }
+
+    /*
+    * ----------------------------------------------------------------------------------------------------------
+    * -------------------------------------- PUBLIC ADMIN ------------------------------------------------------
+    * ----------------------------------------------------------------------------------------------------------
+    */
+
+    /**
+     * @dev Pauses deposits. Withdraws all funds, leaving rewards behind
+     *      Can only be called by strategist or owner.
+     */
+    function panic() public {
+        _onlyStrategistOrOwner();
+        IMasterChefv2(MASTER_CHEF).emergencyWithdraw(poolId, address(this));
+        pause();
+    }
+
+    /**
+     * @dev Pauses the strat. Can only be called by strategist or owner.
+     */
+    function pause() public {
+        _onlyStrategistOrOwner();
+        _pause();
+        _removeAllowances();
+    }
+
+    /*
+    * ----------------------------------------------------------------------------------------------------------
+    * -------------------------------------- INTERNAL MUTATIVE -------------------------------------------------
+    * ----------------------------------------------------------------------------------------------------------
+    */    
+
     /**
      * @dev Core function of the strat, in charge of collecting and re-investing rewards.
      * 1. It claims rewards from the protocol.
@@ -148,19 +285,8 @@ contract ReaperAutoCompound_LiquidV2_Beethoven is ReaperBaseStrategy {
     }
 
     /**
-     * @dev Returns the approx amount of profit from harvesting plus fee that
-     *      would be returned to harvest caller.
+     * @dev Swaps {REWARD_TOKEN} farmed to {WFTM}
      */
-    function estimateHarvest() external view virtual override returns (uint256 profit, uint256 callFeeAmount) {
-        uint256 wftmFromProfit = IUniswapV2Router(SPIRIT_ROUTER).getAmountsOut(
-            IMasterChefv2(MASTER_CHEF).pendingLqdr(poolId, address(this)),
-            rewardTokenToWftmRoute
-        )[1];
-        profit = (wftmFromProfit * totalFee) / PERCENT_DIVISOR;
-        callFeeAmount = (profit * callFee) / PERCENT_DIVISOR;
-        profit -= callFeeAmount;
-    }
-
     function _swapRewardToWftm() internal {
         uint256 rewardTokenBal = IERC20(REWARD_TOKEN).balanceOf(address(this));
         IUniswapV2Router(SPIRIT_ROUTER).swapExactTokensForTokensSupportingFeeOnTransferTokens(
@@ -259,84 +385,6 @@ contract ReaperAutoCompound_LiquidV2_Beethoven is ReaperBaseStrategy {
     }
 
     /**
-     * @dev Set new route to swap from wftm to a token
-     * Does not check that token is an underlying
-     */
-    function setWftmToUnderlyingSwapRoute(address _token, address[] memory _route) external {
-        _onlyStrategistOrOwner();
-        require(_route[0] == WFTM && _route[_route.length - 1] == _token);
-        wftmToUnderlyingRoute[_token] = _route;
-    }
-
-    /**
-     * @dev Set new router to swap from wftm to a token
-     */
-    function setUnderlyingToRouter(address _token, address _router) external {
-        _onlyStrategistOrOwner();
-        require(_router == SPIRIT_ROUTER || _router == SPOOKY_ROUTER, 'unknown router');
-        underlyingToRouter[_token] = _router;
-    }
-
-    /**
-     * @dev Function to calculate the total underlying {token} held by the strat.
-     * It takes into account both the funds in hand, as the funds allocated in protocols.
-     */
-    function balanceOf() public view override returns (uint256 balance) {
-        balance = IERC20(bpToken).balanceOf(address(this)) + balanceOfPool();
-    }
-
-    function balanceOfPool() public view returns (uint256) {
-        (uint256 _amount, ) = IMasterChefv2(MASTER_CHEF).userInfo(poolId, address(this));
-        return _amount;
-    }
-
-    /**
-     * @dev Function that has to be called as part of strat migration. It sends all the available funds back to the
-     *      vault, ready to be migrated to the new strat.
-     */
-    function retireStrat() external {
-        require(msg.sender == vault, '!vault');
-
-        IMasterChefv2(MASTER_CHEF).withdrawAndHarvest(poolId, balanceOfPool(), address(this));
-
-        uint256 rewardTokenBal = IERC20(REWARD_TOKEN).balanceOf(address(this));
-        uint256 bpTokenBal = IERC20(bpToken).balanceOf(address(this));
-        IERC20(REWARD_TOKEN).transfer(vault, rewardTokenBal);
-        IERC20(bpToken).transfer(vault, bpTokenBal);
-    }
-
-    /**
-     * @dev Pauses deposits. Withdraws all funds, leaving rewards behind
-     *      Can only be called by strategist or owner.
-     */
-    function panic() public {
-        _onlyStrategistOrOwner();
-        IMasterChefv2(MASTER_CHEF).emergencyWithdraw(poolId, address(this));
-        pause();
-    }
-
-    /**
-     * @dev Pauses the strat. Can only be called by strategist or owner.
-     */
-    function pause() public {
-        _onlyStrategistOrOwner();
-        _pause();
-        _removeAllowances();
-    }
-
-    /**
-     * @dev Unpauses the strat. Can only be called by strategist or owner.
-     */
-    function unpause() external {
-        _onlyStrategistOrOwner();
-        _unpause();
-
-        _giveAllowances();
-
-        deposit();
-    }
-
-    /**
      * @dev Set allowance for token transfers
      */
     function _giveAllowances() internal {
@@ -378,6 +426,10 @@ contract ReaperAutoCompound_LiquidV2_Beethoven is ReaperBaseStrategy {
         }
     }
 
+    /**
+     * @dev Initializes variables for the underlying tokens such as token swap routes
+     *      and the weights of each token in the pool.
+     */
     function _initializeUnderlyingTokens(IERC20[] memory _underlyingTokens) internal {
         uint256[] memory normalizedWeights = IBaseWeightedPool(bpToken).getNormalizedWeights();
         
