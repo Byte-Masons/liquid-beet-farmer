@@ -223,8 +223,7 @@ describe("Vaults", () => {
                 [treasury.address, paymentRouterAddress],
                 [strategistAddress],
                 wantAddress,
-                poolId,
-                [2500,2500,2500,2500]
+                poolId
             );
 
             await vault.proposeStrat(newStrategy.address);

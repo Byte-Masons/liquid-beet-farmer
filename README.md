@@ -1,9 +1,10 @@
-# Scream Stable Optimizer
-This strategy maximizes yield by lending and borrowing stables on scream.sh.
+# Liquid beethoven compounder
+This strategy maximizes yield on beethoven pools hosted by liquiddriver.
 
 # Scripts
     npm run prettier:sol --> run prettier in contracts folder
     npm run lint:sol --> lint contract folder
+    npx hardhat test
 
 # Basic Sample Hardhat Project
 
