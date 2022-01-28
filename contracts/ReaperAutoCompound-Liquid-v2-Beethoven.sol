@@ -89,7 +89,7 @@ contract ReaperAutoCompound_LiquidV2_Beethoven is ReaperBaseStrategy {
             } else {
                 wftmToUnderlyingRoute[bptUnderlyingTokens[i]] = [WFTM, bptUnderlyingTokens[i]];
             }
-            underlyingToWeight[bptUnderlyingTokens[i]] = normalizedWeights[i] * PERCENT_DIVISOR / 1e18;
+            underlyingToWeight[bptUnderlyingTokens[i]] = (normalizedWeights[i] * PERCENT_DIVISOR) / 1e18;
             console.log('TOKEN: ', bptUnderlyingTokens[i]);
             console.log('WEIGHT out of 10000: ', underlyingToWeight[bptUnderlyingTokens[i]]);
             underlyingToRouter[bptUnderlyingTokens[i]] = SPOOKY_ROUTER;
@@ -269,7 +269,7 @@ contract ReaperAutoCompound_LiquidV2_Beethoven is ReaperBaseStrategy {
 
     function setUnderlyingToRouter(address _token, address _router) external {
         _onlyStrategistOrOwner();
-        require(_router == SPIRIT_ROUTER || _router == SPOOKY_ROUTER,"wrong router");
+        require(_router == SPIRIT_ROUTER || _router == SPOOKY_ROUTER, 'wrong router');
         underlyingToRouter[_token] = _router;
     }
 
