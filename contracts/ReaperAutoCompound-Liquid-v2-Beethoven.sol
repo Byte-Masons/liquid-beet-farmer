@@ -62,9 +62,9 @@ contract ReaperAutoCompound_LiquidV2_Beethoven is ReaperBaseStrategy {
     mapping(address => address) public underlyingToRouter;
 
     /**
-     * @dev Other 
+     * @dev Other
      * {poolId} - Id of the pool managed by the liquid masterchef
-     * {beethoven_poolId_bytes} - Bytes representation of the beethoven pool 
+     * {beethoven_poolId_bytes} - Bytes representation of the beethoven pool
      */
     uint256 public immutable poolId;
     bytes32 public immutable beethoven_poolId_bytes;
@@ -87,21 +87,11 @@ contract ReaperAutoCompound_LiquidV2_Beethoven is ReaperBaseStrategy {
         bpToken = _bpToken;
         poolId = _poolId;
         beethoven_poolId_bytes = IBasePool(_bpToken).getPoolId();
-        uint256[] memory normalizedWeights = IBaseWeightedPool(_bpToken).getNormalizedWeights();
-        IERC20[] memory _bpTokens;
-        (_bpTokens, , ) = IVault(BEET_VAULT).getPoolTokens(beethoven_poolId_bytes);
+        IERC20[] memory _underlyingTokens;
+        (_underlyingTokens, , ) = IVault(BEET_VAULT).getPoolTokens(beethoven_poolId_bytes);
+        totalUnderlyingTokens = _underlyingTokens.length;
 
-        totalUnderlyingTokens = _bpTokens.length;
-        for (uint256 i; i < totalUnderlyingTokens; i++) {
-            bptUnderlyingTokens.push(address(_bpTokens[i]));
-            if (bptUnderlyingTokens[i] == WFTM) {
-                wftmToUnderlyingRoute[WFTM] = [WFTM];
-            } else {
-                wftmToUnderlyingRoute[bptUnderlyingTokens[i]] = [WFTM, bptUnderlyingTokens[i]];
-            }
-            underlyingToWeight[bptUnderlyingTokens[i]] = (normalizedWeights[i] * PERCENT_DIVISOR) / 1e18; // Weight is represented with 18 decimals
-            underlyingToRouter[bptUnderlyingTokens[i]] = SPOOKY_ROUTER;
-        }
+        _initializeUnderlyingTokens(_underlyingTokens);
 
         _giveAllowances();
     }
@@ -385,6 +375,21 @@ contract ReaperAutoCompound_LiquidV2_Beethoven is ReaperBaseStrategy {
                 BEET_VAULT,
                 IERC20(bptUnderlyingTokens[i]).allowance(address(this), BEET_VAULT)
             );
+        }
+    }
+
+    function _initializeUnderlyingTokens(IERC20[] memory _underlyingTokens) internal {
+        uint256[] memory normalizedWeights = IBaseWeightedPool(bpToken).getNormalizedWeights();
+        
+        for (uint256 i; i < totalUnderlyingTokens; i++) {
+            bptUnderlyingTokens.push(address(_underlyingTokens[i]));
+            if (bptUnderlyingTokens[i] == WFTM) {
+                wftmToUnderlyingRoute[WFTM] = [WFTM];
+            } else {
+                wftmToUnderlyingRoute[bptUnderlyingTokens[i]] = [WFTM, bptUnderlyingTokens[i]];
+            }
+            underlyingToWeight[bptUnderlyingTokens[i]] = (normalizedWeights[i] * PERCENT_DIVISOR) / 1e18; // Weight is represented with 18 decimals
+            underlyingToRouter[bptUnderlyingTokens[i]] = SPOOKY_ROUTER;
         }
     }
 }
