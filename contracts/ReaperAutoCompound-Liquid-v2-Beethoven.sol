@@ -2,8 +2,6 @@
 
 pragma solidity 0.8.9;
 
-import 'hardhat/console.sol';
-
 import './ReaperBaseStrategy.sol';
 import './interfaces/IBasePool.sol';
 import './interfaces/IBaseWeightedPool.sol';
@@ -90,8 +88,6 @@ contract ReaperAutoCompound_LiquidV2_Beethoven is ReaperBaseStrategy {
                 wftmToUnderlyingRoute[bptUnderlyingTokens[i]] = [WFTM, bptUnderlyingTokens[i]];
             }
             underlyingToWeight[bptUnderlyingTokens[i]] = (normalizedWeights[i] * PERCENT_DIVISOR) / 1e18;
-            console.log('TOKEN: ', bptUnderlyingTokens[i]);
-            console.log('WEIGHT out of 10000: ', underlyingToWeight[bptUnderlyingTokens[i]]);
             underlyingToRouter[bptUnderlyingTokens[i]] = SPOOKY_ROUTER;
         }
 
