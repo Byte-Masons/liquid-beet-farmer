@@ -8,8 +8,8 @@ This strategy maximizes yield on beethoven pools hosted by liquiddriver.
 
 # Contract addresses
 ## LATE QUARTET
-Vault : 0xbdf94B9D813AE4B54D9B221C6fd003AF2e1B8432
-Strategy : 0x850aB9BCB1a38808526f682466683947000BFDe3
+Vault : 0x5F5181128C19D9d08c2c25eC802e656F1E966dA4
+Strategy : 0x5abb3d0Ff599cE0CAE3C3C718AE1B0514c9617c9
  
 # Basic Sample Hardhat Project
 

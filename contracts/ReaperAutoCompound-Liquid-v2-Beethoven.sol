@@ -96,8 +96,6 @@ contract ReaperAutoCompound_LiquidV2_Beethoven is ReaperBaseStrategy {
         _giveAllowances();
     }
 
-    // CORE FUNCTIONS
-
     /*
     * ----------------------------------------------------------------------------------------------------------
     * -------------------------------------- EXTERNAL MUTATIVE -------------------------------------------------
