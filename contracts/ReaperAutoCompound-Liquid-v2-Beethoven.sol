@@ -324,19 +324,20 @@ contract ReaperAutoCompound_LiquidV2_Beethoven is ReaperBaseStrategy {
 
         for (uint256 i; i < totalUnderlyingTokens; i++) {
             address token = bptUnderlyingTokens[i];
+            address tokenRouter = underlyingToRouter[token];
             if (token == WFTM) {
                 continue;
             }
 
             uint256 wftmToSwap = (wftmBal * underlyingToWeight[token]) / PERCENT_DIVISOR;
-            uint256 amountOut = IUniswapV2Router(SPOOKY_ROUTER).getAmountsOut(wftmToSwap, wftmToUnderlyingRoute[token])[
+            uint256 amountOut = IUniswapV2Router(tokenRouter).getAmountsOut(wftmToSwap, wftmToUnderlyingRoute[token])[
                 1
             ];
             if (amountOut == 0) {
                 continue;
             }
 
-            IUniswapV2Router(SPOOKY_ROUTER).swapExactTokensForTokensSupportingFeeOnTransferTokens(
+            IUniswapV2Router(tokenRouter).swapExactTokensForTokensSupportingFeeOnTransferTokens(
                 wftmToSwap,
                 0,
                 wftmToUnderlyingRoute[token],
