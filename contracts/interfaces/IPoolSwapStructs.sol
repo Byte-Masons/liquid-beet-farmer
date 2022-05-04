@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.9;
+pragma solidity ^0.8.0;
 
-import './IVault.sol';
+import "./IBeetVault.sol";
 
 interface IPoolSwapStructs {
     // This is not really an interface - it just defines common structs used by other interfaces: IGeneralPool and
@@ -30,9 +30,9 @@ interface IPoolSwapStructs {
     //
     // `userData` is extra data provided by the caller - typically a signature from a trusted party.
     struct SwapRequest {
-        IVault.SwapKind kind;
-        IERC20 tokenIn;
-        IERC20 tokenOut;
+        IBeetVault.SwapKind kind;
+        IERC20Upgradeable tokenIn;
+        IERC20Upgradeable tokenOut;
         uint256 amount;
         // Misc data
         bytes32 poolId;

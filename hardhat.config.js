@@ -1,46 +1,24 @@
-require("@nomiclabs/hardhat-waffle");
+require('dotenv').config();
 
-const { devAccount, strategistAccount } = require("./secrets.json");
+require('@nomiclabs/hardhat-etherscan');
+require('@nomiclabs/hardhat-waffle');
+require('hardhat-gas-reporter');
+require('hardhat-interface-generator');
+require('hardhat-contract-sizer');
+require('solidity-coverage');
+require('@openzeppelin/hardhat-upgrades');
 
-// This is a sample Hardhat task. To learn how to create your own go to
-// https://hardhat.org/guides/create-task.html
-// eslint-disable-next-line no-undef
-task("accounts", "Prints the list of accounts", async (taskArgs, hre) => {
-  const accounts = await hre.ethers.getSigners();
-
-  for (const account of accounts) {
-    console.log(account.address);
-  }
-});
-
-// You need to export an object to set up your config
-// Go to https://hardhat.org/config/ to learn more
+const PRIVATE_KEY = process.env.DEPLOYER_PRIVATE_KEY;
+const FTMSCAN_KEY = process.env.FTMSCAN_API_KEY;
 
 /**
  * @type import('hardhat/config').HardhatUserConfig
  */
 module.exports = {
-  networks: {
-    hardhat: {
-      forking: {
-        url: "https://rpc.ftm.tools/",
-        accounts: [devAccount],
-        blockNumber: 29218651,
-      },
-      mining: {
-        auto: true,
-        interval: 1000,
-      },
-    },
-    opera: {
-      url: "https://rpc.ftm.tools/",
-      accounts: [strategistAccount],
-    },
-  },
   solidity: {
     compilers: [
       {
-        version: "0.8.9",
+        version: '0.8.11',
         settings: {
           optimizer: {
             enabled: true,
@@ -49,43 +27,7 @@ module.exports = {
         },
       },
       {
-        version: "0.8.1",
-        settings: {
-          optimizer: {
-            enabled: true,
-            runs: 200,
-          },
-        },
-      },
-      {
-        version: "0.7.0",
-        settings: {
-          optimizer: {
-            enabled: true,
-            runs: 200,
-          },
-        },
-      },
-      {
-        version: "0.6.0",
-        settings: {
-          optimizer: {
-            enabled: true,
-            runs: 200,
-          },
-        },
-      },
-      {
-        version: "0.6.2",
-        settings: {
-          optimizer: {
-            enabled: true,
-            runs: 200,
-          },
-        },
-      },
-      {
-        version: "0.6.12",
+        version: '0.6.12',
         settings: {
           optimizer: {
             enabled: true,
@@ -95,7 +37,22 @@ module.exports = {
       },
     ],
   },
+  networks: {
+    mainnet: {
+      url: `https://rpc.ftm.tools`,
+      chainId: 250,
+      accounts: [`0x${PRIVATE_KEY}`],
+    },
+    testnet: {
+      url: `https://rpcapi-tracing.testnet.fantom.network`,
+      chainId: 4002,
+      accounts: [`0x${PRIVATE_KEY}`],
+    },
+  },
+  etherscan: {
+    apiKey: FTMSCAN_KEY,
+  },
   mocha: {
-    timeout: 2000000,
+    timeout: 1200000,
   },
 };

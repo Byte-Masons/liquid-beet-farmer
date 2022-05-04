@@ -84,7 +84,7 @@ describe("Vaults", () => {
         selfAddress = await self.getAddress();
 
         // get artifacts
-        Strategy = await ethers.getContractFactory("ReaperAutoCompound_LiquidV2_Beethoven");
+        Strategy = await ethers.getContractFactory("ReaperStrategyLiquidBeethoven");
         Vault = await ethers.getContractFactory("ReaperVaultv1_3");
         Treasury = await ethers.getContractFactory("ReaperTreasury");
         Want = await ethers.getContractFactory("Usdc");
