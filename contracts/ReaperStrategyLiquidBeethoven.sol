@@ -7,7 +7,7 @@ import './interfaces/IAsset.sol';
 import './interfaces/IBasePool.sol';
 import './interfaces/IBeetVault.sol';
 import './interfaces/ILinearPool.sol';
-import './interfaces/IMasterChefv2.sol';
+import './interfaces/IMasterChef.sol';
 import './interfaces/IUniswapV2Router.sol';
 import '@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol';
 
@@ -68,7 +68,7 @@ contract ReaperStrategyLiquidBeethoven is ReaperBaseStrategyv2 {
 
         if (wantBalance != 0) {
             IERC20Upgradeable(want).safeIncreaseAllowance(MASTER_CHEF, wantBalance);
-            IMasterChefv2(MASTER_CHEF).deposit(poolId, wantBalance, address(this));
+            IMasterChef(MASTER_CHEF).deposit(poolId, wantBalance, address(this));
         }
     }
 
@@ -76,12 +76,12 @@ contract ReaperStrategyLiquidBeethoven is ReaperBaseStrategyv2 {
      * @dev Withdraws funds and sends them back to the vault.
      */
     function _withdraw(uint256 _amount) internal override {
-        // uint256 wantBal = IERC20Upgradeable(want).balanceOf(address(this));
-        // if (wantBal < _amount) {
-        //     IMasterChef(MASTER_CHEF).withdrawAndHarvest(poolId, _amount - wantBal, address(this));
-        // }
+        uint256 wantBal = IERC20Upgradeable(want).balanceOf(address(this));
+        if (wantBal < _amount) {
+            IMasterChef(MASTER_CHEF).withdraw(poolId, _amount - wantBal, address(this));
+        }
 
-        // IERC20Upgradeable(want).safeTransfer(vault, _amount);
+        IERC20Upgradeable(want).safeTransfer(vault, _amount);
     }
 
     /**
@@ -187,7 +187,7 @@ contract ReaperStrategyLiquidBeethoven is ReaperBaseStrategyv2 {
      *      It takes into account both the funds in hand, plus the funds in the MasterChef.
      */
     function balanceOf() public view override returns (uint256) {
-        (uint256 amount, ) = IMasterChefv2(MASTER_CHEF).userInfo(poolId, address(this));
+        (uint256 amount, ) = IMasterChef(MASTER_CHEF).userInfo(poolId, address(this));
         return amount + IERC20Upgradeable(want).balanceOf(address(this));
     }
 

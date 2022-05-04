@@ -99,7 +99,7 @@ describe('Vaults', function () {
   });
 
   describe('Deploying the vault and strategy', function () {
-    it('should initiate vault with a 0 balance', async function () {
+    xit('should initiate vault with a 0 balance', async function () {
       const totalBalance = await vault.balance();
       const availableBalance = await vault.available();
       const pricePerFullShare = await vault.getPricePerFullShare();
@@ -110,7 +110,7 @@ describe('Vaults', function () {
   });
 
   describe('Vault Tests', function () {
-    it('should allow deposits and account for them correctly', async function () {
+    xit('should allow deposits and account for them correctly', async function () {
       const userBalance = await want.balanceOf(wantHolderAddr);
       const vaultBalance = await vault.balance();
       const depositAmount = toWantUnit('10');
@@ -122,7 +122,7 @@ describe('Vaults', function () {
       expect(depositAmount).to.be.closeTo(newVaultBalance, allowedInaccuracy);
     });
 
-    xit('should allow withdrawals', async function () {
+    it('should allow withdrawals', async function () {
       const userBalance = await want.balanceOf(wantHolderAddr);
       const depositAmount = toWantUnit('100');
       await vault.connect(wantHolder).deposit(depositAmount);
