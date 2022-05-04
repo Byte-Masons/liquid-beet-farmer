@@ -23,6 +23,7 @@ contract ReaperStrategyLiquidBeethoven is ReaperBaseStrategyv2 {
     address public constant BEET_VAULT = address(0x20dd72Ed959b6147912C2e529F0a0C651c33c9ce);
     address public constant MASTER_CHEF = address(0x6e2ad6527901c9664f016466b8DA1357a004db0f);
     address public constant SPOOKY_ROUTER = address(0xF491e7B69E4244ad4002BC14e878a34207E38c29);
+    address public constant SPIRIT_ROUTER = address(0x16327E3FbDaCA3bcF7E38F5Af2599D2DDc33aE52);
 
     /**
      * @dev Tokens Used:
@@ -92,57 +93,60 @@ contract ReaperStrategyLiquidBeethoven is ReaperBaseStrategyv2 {
      *      4. Deposit.
      */
     function _harvestCore() internal override {
-        // IMasterChef(MASTER_CHEF).harvest(poolId, address(this));
-        // _performSwapsAndChargeFees();
-        // _addLiquidity();
-        // deposit();
+        _claimRewards();
+        _swapRewardToWftm();
+        _chargeFees();
+        _addLiquidity();
+        deposit();
+    }
+
+    function _claimRewards() internal {
+        IMasterChef(MASTER_CHEF).harvest(poolId, address(this));
+    }
+
+    /**
+     * @dev Swaps {REWARD_TOKEN} farmed to {WFTM}
+     */
+    function _swapRewardToWftm() internal {
+        uint256 lqdrBalance = IERC20Upgradeable(LQDR).balanceOf(address(this));
+        address[] memory lqdrToWftmRoute = new address[](2);
+        lqdrToWftmRoute[0] = LQDR;
+        lqdrToWftmRoute[1] = WFTM;
+        IERC20Upgradeable(LQDR).safeIncreaseAllowance(SPIRIT_ROUTER, lqdrBalance);
+        IUniswapV2Router(SPIRIT_ROUTER).swapExactTokensForTokensSupportingFeeOnTransferTokens(
+            lqdrBalance,
+            0,
+            lqdrToWftmRoute,
+            address(this),
+            block.timestamp + 600
+        );
     }
 
     /**
      * @dev Core harvest function.
      *      Charges fees based on the amount of WFTM gained from reward
      */
-    function _performSwapsAndChargeFees() internal {
-        // IERC20Upgradeable wftm = IERC20Upgradeable(WFTM);
-        // uint256 startingWftmBal = wftm.balanceOf(address(this));
-        // uint256 wftmFee = 0;
+    function _chargeFees() internal {
+        uint256 wftmFee = (IERC20Upgradeable(WFTM).balanceOf(address(this)) * totalFee) / PERCENT_DIVISOR;
+        if (wftmFee != 0) {
+            uint256 callFeeAmount = (wftmFee * callFee) / PERCENT_DIVISOR;
+            uint256 treasuryFeeAmount = (wftmFee * treasuryFee) / PERCENT_DIVISOR;
+            uint256 strategistFeeAmount = (treasuryFeeAmount * strategistFee) / PERCENT_DIVISOR;
+            treasuryFeeAmount -= strategistFeeAmount;
 
-        // _swap(
-        //     SD,
-        //     USDC,
-        //     (IERC20Upgradeable(SD).balanceOf(address(this)) * totalFee) / PERCENT_DIVISOR,
-        //     SD_USDC_sFTMx_POOL,
-        //     true
-        // );
-        // _swap(USDC, WFTM, IERC20Upgradeable(USDC).balanceOf(address(this)), WFTM_USDC_POOL, true);
-        // wftmFee += wftm.balanceOf(address(this)) - startingWftmBal;
-        // startingWftmBal = wftm.balanceOf(address(this));
-
-        // _swap(BEETS, WFTM, IERC20Upgradeable(BEETS).balanceOf(address(this)), WFTM_BEETS_POOL, true);
-        // wftmFee += ((wftm.balanceOf(address(this)) - startingWftmBal) * totalFee) / PERCENT_DIVISOR;
-
-        // if (wftmFee != 0) {
-        //     uint256 callFeeToUser = (wftmFee * callFee) / PERCENT_DIVISOR;
-        //     uint256 treasuryFeeToVault = (wftmFee * treasuryFee) / PERCENT_DIVISOR;
-        //     uint256 feeToStrategist = (treasuryFeeToVault * strategistFee) / PERCENT_DIVISOR;
-        //     treasuryFeeToVault -= feeToStrategist;
-
-        //     wftm.safeTransfer(msg.sender, callFeeToUser);
-        //     wftm.safeTransfer(treasury, treasuryFeeToVault);
-        //     wftm.safeTransfer(strategistRemitter, feeToStrategist);
-        // }
+            IERC20Upgradeable(WFTM).safeTransfer(msg.sender, callFeeAmount);
+            IERC20Upgradeable(WFTM).safeTransfer(treasury, treasuryFeeAmount);
+            IERC20Upgradeable(WFTM).safeTransfer(strategistRemitter, strategistFeeAmount);
+        }
     }
 
     /**
      * @dev Core harvest function.
-     *      Creates new {want} tokens using {WFTM} and {SD} balance.
+     *      Creates new {want} tokens using {WFTM} balance.
      */
     function _addLiquidity() internal {
-        // _swap(WFTM, WFTM_LINEAR_BPT, IERC20Upgradeable(WFTM).balanceOf(address(this)), WFTM_LINEAR_POOL, true);
-        // _swap(WFTM_LINEAR_BPT, want, IERC20Upgradeable(WFTM_LINEAR_BPT).balanceOf(address(this)), beetsPoolId, false);
-
-        // _swap(SD, sFTMx, IERC20Upgradeable(SD).balanceOf(address(this)), SD_USDC_sFTMx_POOL, true);
-        // _swap(sFTMx, want, IERC20Upgradeable(sFTMx).balanceOf(address(this)), beetsPoolId, true);
+        _swap(WFTM, WFTM_LINEAR_BPT, IERC20Upgradeable(WFTM).balanceOf(address(this)), WFTM_LINEAR_POOL, true);
+        _swap(WFTM_LINEAR_BPT, want, IERC20Upgradeable(WFTM_LINEAR_BPT).balanceOf(address(this)), beetsPoolId, false);
     }
 
     /**
@@ -196,60 +200,27 @@ contract ReaperStrategyLiquidBeethoven is ReaperBaseStrategyv2 {
      *      Profit is denominated in WFTM, and takes fees into account.
      */
     function estimateHarvest() external view override returns (uint256 profit, uint256 callFeeToUser) {
-        // IMasterChef masterChef = IMasterChef(MASTER_CHEF);
-        // uint256 pendingReward = masterChef.pendingBeets(poolId, address(this));
-        // uint256 totalRewards = pendingReward + IERC20Upgradeable(BEETS).balanceOf(address(this));
+        address[] memory lqdrToWftmRoute = new address[](2);
+        lqdrToWftmRoute[0] = LQDR;
+        lqdrToWftmRoute[1] = WFTM;
+        uint256 pendingLqdr = IMasterChef(MASTER_CHEF).pendingLqdr(poolId, address(this));
+        uint256 totalRewards = pendingLqdr + IERC20Upgradeable(LQDR).balanceOf(address(this));
 
-        // if (totalRewards != 0) {
-        //     // use SPOOKY_ROUTER here since IBeetVault doesn't have a view query function
-        //     address[] memory beetsToWftmPath = new address[](2);
-        //     beetsToWftmPath[0] = BEETS;
-        //     beetsToWftmPath[1] = WFTM;
-        //     profit += IUniswapV2Router01(SPOOKY_ROUTER).getAmountsOut(totalRewards, beetsToWftmPath)[1];
-        // }
+        uint256 wftmFromProfit = IUniswapV2Router(SPIRIT_ROUTER).getAmountsOut(
+            totalRewards,
+            lqdrToWftmRoute
+        )[1];
 
-        // ISDRewarder rewarder = ISDRewarder(masterChef.rewarder(poolId));
-        // pendingReward = rewarder.pendingToken(poolId, address(this));
-        // totalRewards = pendingReward + IERC20Upgradeable(SD).balanceOf(address(this));
-        // if (totalRewards != 0) {
-        //     address[] memory sdToWftmPath = new address[](3);
-        //     sdToWftmPath[0] = SD;
-        //     sdToWftmPath[1] = USDC;
-        //     sdToWftmPath[2] = WFTM;
-        //     profit += IUniswapV2Router01(SPOOKY_ROUTER).getAmountsOut(totalRewards, sdToWftmPath)[1];
-        // }
-
-        // profit += IERC20Upgradeable(WFTM).balanceOf(address(this));
-
-        // uint256 wftmFee = (profit * totalFee) / PERCENT_DIVISOR;
-        // callFeeToUser = (wftmFee * callFee) / PERCENT_DIVISOR;
-        // profit -= wftmFee;
-    }
-
-    /**
-     * @dev Function to retire the strategy. Claims all rewards and withdraws
-     *      all principal from external contracts, and sends everything back to
-     *      the vault. Can only be called by strategist or owner.
-     *
-     * Note: this is not an emergency withdraw function. For that, see panic().
-     */
-    function _retireStrat() internal override {
-        // (uint256 poolBal, ) = IMasterChef(MASTER_CHEF).userInfo(poolId, address(this));
-        // IMasterChef(MASTER_CHEF).withdrawAndHarvest(poolId, poolBal, address(this));
-
-        // _swap(BEETS, WFTM, IERC20Upgradeable(BEETS).balanceOf(address(this)), WFTM_BEETS_POOL, true);
-        // _addLiquidity();
-
-        // uint256 wantBalance = IERC20Upgradeable(want).balanceOf(address(this));
-        // if (wantBalance != 0) {
-        //     IERC20Upgradeable(want).safeTransfer(vault, wantBalance);
-        // }
+        uint256 totalWftm = wftmFromProfit + IERC20Upgradeable(WFTM).balanceOf(address(this));
+        profit = (totalWftm * totalFee) / PERCENT_DIVISOR;
+        callFeeToUser = (profit * callFee) / PERCENT_DIVISOR;
+        profit -= callFeeToUser;
     }
 
     /**
      * Withdraws all funds leaving rewards behind.
      */
     function _reclaimWant() internal override {
-        // IMasterChef(MASTER_CHEF).emergencyWithdraw(poolId, address(this));
+        IMasterChef(MASTER_CHEF).emergencyWithdraw(poolId, address(this));
     }
 }

@@ -122,7 +122,7 @@ describe('Vaults', function () {
       expect(depositAmount).to.be.closeTo(newVaultBalance, allowedInaccuracy);
     });
 
-    it('should allow withdrawals', async function () {
+    xit('should allow withdrawals', async function () {
       const userBalance = await want.balanceOf(wantHolderAddr);
       const depositAmount = toWantUnit('100');
       await vault.connect(wantHolder).deposit(depositAmount);
@@ -208,7 +208,7 @@ describe('Vaults', function () {
       console.log(`Average APR across ${numHarvests} harvests is ${averageAPR} basis points.`);
     });
   });
-  xdescribe('Strategy', function () {
+  describe('Strategy', function () {
     it('should be able to pause and unpause', async function () {
       await strategy.pause();
       const depositAmount = toWantUnit('1');
@@ -228,25 +228,6 @@ describe('Vaults', function () {
       const wantStratBalance = await want.balanceOf(strategy.address);
       const allowedImprecision = toWantUnit('0.000000001');
       expect(strategyBalance).to.be.closeTo(wantStratBalance, allowedImprecision);
-    });
-
-    it('should be able to retire strategy', async function () {
-      const depositAmount = toWantUnit('1000');
-      await vault.connect(wantHolder).deposit(depositAmount);
-      const vaultBalance = await vault.balance();
-      const strategyBalance = await strategy.balanceOf();
-      expect(vaultBalance).to.equal(strategyBalance);
-
-      await expect(strategy.retireStrat()).to.not.be.reverted;
-      const newVaultBalance = await vault.balance();
-      const newStrategyBalance = await strategy.balanceOf();
-      const allowedImprecision = toWantUnit('0.001');
-      expect(newVaultBalance).to.be.closeTo(vaultBalance, allowedImprecision);
-      expect(newStrategyBalance).to.be.lt(allowedImprecision);
-    });
-
-    it('should be able to retire strategy with no balance', async function () {
-      await expect(strategy.retireStrat()).to.not.be.reverted;
     });
 
     it('should be able to estimate harvest', async function () {

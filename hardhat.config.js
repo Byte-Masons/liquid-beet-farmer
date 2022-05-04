@@ -39,7 +39,7 @@ module.exports = {
   },
   networks: {
     mainnet: {
-      url: `https://rpc.ftm.tools`,
+      url: `https://rpcapi-tracing.fantom.network/`,
       chainId: 250,
       accounts: [`0x${PRIVATE_KEY}`],
     },
