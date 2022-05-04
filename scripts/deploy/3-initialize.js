@@ -1,8 +1,8 @@
 async function main() {
-  const vaultAddress = "0x5F5181128C19D9d08c2c25eC802e656F1E966dA4";
-  const strategyAddress = '0x5ee8E0558D81604439fC67C389B3B8c8a909607C';
+  const vaultAddress = '0x783967b305B9C54325DD33ED943Bb49EFa31adF5';
+  const strategyAddress = '0x2C02c3C70324a162bB0572488eA6317A45443059';
 
-  const Vault = await ethers.getContractFactory('ReaperVaultv1_3');
+  const Vault = await ethers.getContractFactory('ReaperVaultv1_4');
   const vault = Vault.attach(vaultAddress);
 
   await vault.initialize(strategyAddress);
@@ -11,7 +11,7 @@ async function main() {
 
 main()
   .then(() => process.exit(0))
-  .catch(error => {
+  .catch((error) => {
     console.error(error);
     process.exit(1);
   });
