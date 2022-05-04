@@ -12,9 +12,7 @@ import './interfaces/IUniswapV2Router.sol';
 import '@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol';
 
 /**
- * @dev Strategy description
- *
- * Expect the amount of staked tokens you have to grow over time while you have assets deposit
+ * @dev LP compounding strategy for Beethoven-X pools on Liquid Driver
  */
 contract ReaperStrategyLiquidBeethoven is ReaperBaseStrategyv2 {
     using SafeERC20Upgradeable for IERC20Upgradeable;
@@ -87,10 +85,11 @@ contract ReaperStrategyLiquidBeethoven is ReaperBaseStrategyv2 {
 
     /**
      * @dev Core function of the strat, in charge of collecting and re-investing rewards.
-     *      1. Claim {BEETS} and {SD} rewards from MasterChef.
-     *      2. Perform swaps and charge fees.
-     *      3. Create more {want} by "swapping in" to pool.
-     *      4. Deposit.
+     *      1. Claim {LQDR} from MasterChef.
+     *      2. Swap {LQDR} to {WFTM}
+     *      3. Charges fees
+     *      4. Create more {want} by swapping in to the want pool token
+     *      5. Deposit in the MasterChef
      */
     function _harvestCore() internal override {
         _claimRewards();
@@ -100,12 +99,15 @@ contract ReaperStrategyLiquidBeethoven is ReaperBaseStrategyv2 {
         deposit();
     }
 
+    /**
+     * @dev Claims the {LQDR} rewards from MASTER_CHEF
+     */
     function _claimRewards() internal {
         IMasterChef(MASTER_CHEF).harvest(poolId, address(this));
     }
 
     /**
-     * @dev Swaps {REWARD_TOKEN} farmed to {WFTM}
+     * @dev Swaps {LQDR} farmed to {WFTM}
      */
     function _swapRewardToWftm() internal {
         uint256 lqdrBalance = IERC20Upgradeable(LQDR).balanceOf(address(this));
